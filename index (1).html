@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SwimSync</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Barlow+Condensed:wght@300;400;700;800;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:      #080a0d;
+    --surface: #0f1318;
+    --border:  #1a2030;
+    --accent:  #00d4ff;
+    --red:     #ff3b3b;
+    --green:   #00e676;
+    --text:    #dde3ed;
+    --text2:   #6b7a8d;
+    --text3:   #2e3a48;
+    --mono:   'DM Mono', monospace;
+    --display:'Barlow Condensed', sans-serif;
+    --body:   'Barlow', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    overflow-x: hidden;
+  }
+
+  /* ── GRID BACKGROUND ──────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── SCANLINE OVERLAY ─────────────────────────── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,.08) 2px,
+      rgba(0,0,0,.08) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── GLOW ORBS ────────────────────────────────── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.18;
+  }
+  .orb-1 { width: 500px; height: 500px; background: var(--accent); top: -150px; left: -100px; }
+  .orb-2 { width: 400px; height: 400px; background: var(--red);    bottom: -100px; right: -80px; }
+
+  /* ── WRAPPER ──────────────────────────────────── */
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    gap: 0;
+  }
+
+  /* ── EYEBROW ──────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .22em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    animation: fadeUp .6s ease forwards .1s;
+  }
+  .eyebrow-line {
+    width: 32px; height: 1px;
+    background: var(--accent);
+    opacity: .5;
+  }
+
+  /* ── LOGO ─────────────────────────────────────── */
+  .logo {
+    font-family: var(--display);
+    font-size: clamp(72px, 14vw, 130px);
+    font-weight: 900;
+    letter-spacing: -.01em;
+    line-height: .9;
+    color: var(--text);
+    text-align: center;
+    position: relative;
+    opacity: 0;
+    animation: fadeUp .7s ease forwards .2s;
+  }
+  .logo-accent {
+    color: var(--accent);
+    position: relative;
+  }
+  .logo-accent::after {
+    content: '';
+    position: absolute;
+    bottom: 4px; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+    opacity: .4;
+    border-radius: 2px;
+  }
+
+  /* ── TAGLINE ──────────────────────────────────── */
+  .tagline {
+    margin-top: 22px;
+    font-family: var(--display);
+    font-size: clamp(16px, 3vw, 22px);
+    font-weight: 300;
+    letter-spacing: .12em;
+    color: var(--text2);
+    text-align: center;
+    text-transform: uppercase;
+    opacity: 0;
+    animation: fadeUp .7s ease forwards .35s;
+  }
+
+  /* ── DIVIDER ──────────────────────────────────── */
+  .divider {
+    width: 1px;
+    height: 48px;
+    background: linear-gradient(to bottom, transparent, var(--border), transparent);
+    margin: 40px 0;
+    opacity: 0;
+    animation: fadeUp .6s ease forwards .5s;
+  }
+
+  /* ── CARDS ────────────────────────────────────── */
+  .cards {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeUp .7s ease forwards .55s;
+  }
+
+  .card {
+    position: relative;
+    width: 300px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 32px 28px 28px;
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+    transition: border-color .2s, transform .2s;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    transition: opacity .2s;
+    opacity: 0;
+  }
+  .card-recorder::before { background: var(--red); }
+  .card-viewer::before   { background: var(--accent); }
+
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: transparent;
+  }
+  .card-recorder:hover { border-color: rgba(255,59,59,.3); }
+  .card-viewer:hover   { border-color: rgba(0,212,255,.3); }
+  .card:hover::before  { opacity: 1; }
+
+  /* card glow on hover */
+  .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity .3s;
+    pointer-events: none;
+  }
+  .card-recorder::after { box-shadow: inset 0 0 40px rgba(255,59,59,.07); }
+  .card-viewer::after   { box-shadow: inset 0 0 40px rgba(0,212,255,.07); }
+  .card:hover::after    { opacity: 1; }
+
+  .card-icon {
+    font-size: 28px;
+    margin-bottom: 18px;
+    display: block;
+    line-height: 1;
+  }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .card-recorder .card-label { color: var(--red); }
+  .card-viewer   .card-label { color: var(--accent); }
+
+  .card-title {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: .03em;
+    color: var(--text);
+    margin-bottom: 12px;
+    line-height: 1;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.65;
+    flex: 1;
+  }
+
+  .card-features {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .feature {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .feature-dot {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .card-recorder .feature-dot { background: var(--red);    opacity: .6; }
+  .card-viewer   .feature-dot { background: var(--accent); opacity: .6; }
+
+  .card-cta {
+    margin-top: 24px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: gap .2s;
+  }
+  .card-recorder .card-cta { color: var(--red); }
+  .card-viewer   .card-cta { color: var(--accent); }
+
+  .card:hover .card-cta { letter-spacing: .15em; }
+
+  .arrow {
+    font-size: 16px;
+    transition: transform .2s;
+  }
+  .card:hover .arrow { transform: translateX(4px); }
+
+  /* ── STATUS BAR ───────────────────────────────── */
+  .status-bar {
+    margin-top: 48px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    opacity: 0;
+    animation: fadeUp .6s ease forwards .75s;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: .08em;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .status-dot.green  { background: var(--green);  box-shadow: 0 0 6px var(--green);  }
+  .status-dot.yellow { background: #ffd740; box-shadow: 0 0 6px #ffd740; }
+
+  .status-sep {
+    width: 1px; height: 14px;
+    background: var(--border);
+  }
+
+  /* ── FOOTER ───────────────────────────────────── */
+  .footer {
+    margin-top: 48px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .12em;
+    text-align: center;
+    opacity: 0;
+    animation: fadeUp .6s ease forwards .9s;
+  }
+
+  /* ── ANIMATIONS ───────────────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── RESPONSIVE ───────────────────────────────── */
+  @media (max-width: 680px) {
+    .cards { flex-direction: column; align-items: center; }
+    .card  { width: 100%; max-width: 360px; }
+    .status-bar { gap: 14px; }
+    .status-sep { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="wrapper">
+
+  <div class="eyebrow">
+    <div class="eyebrow-line"></div>
+    Swim Meet Video System
+    <div class="eyebrow-line"></div>
+  </div>
+
+  <div class="logo">
+    SWIM<span class="logo-accent">SYNC</span>
+  </div>
+
+  <div class="tagline">Record · Tag · Review · Instantly</div>
+
+  <div class="divider"></div>
+
+  <div class="cards">
+
+    <!-- RECORDER -->
+    <a class="card card-recorder" href="recorder.html">
+      <span class="card-icon">⏺</span>
+      <div class="card-label">For the Deck</div>
+      <div class="card-title">Recorder</div>
+      <div class="card-desc">
+        Capture races live from any connected camera or upload existing footage.
+        Tag clips in real time and push them instantly to the team.
+      </div>
+      <div class="card-features">
+        <div class="feature"><div class="feature-dot"></div>Live camera capture</div>
+        <div class="feature"><div class="feature-dot"></div>Drag &amp; drop file upload</div>
+        <div class="feature"><div class="feature-dot"></div>Structured tagging (event, heat, lane)</div>
+        <div class="feature"><div class="feature-dot"></div>Offline queue — uploads when back online</div>
+      </div>
+      <div class="card-cta">
+        Open Recorder <span class="arrow">→</span>
+      </div>
+    </a>
+
+    <!-- VIEWER -->
+    <a class="card card-viewer" href="viewer.html">
+      <span class="card-icon">▶</span>
+      <div class="card-label">For Athletes &amp; Coaches</div>
+      <div class="card-title">Viewer</div>
+      <div class="card-desc">
+        Browse, filter, and play back race footage the moment it's uploaded.
+        Filter by swimmer, meet, session, stroke, heat, and more.
+      </div>
+      <div class="card-features">
+        <div class="feature"><div class="feature-dot"></div>Live clip feed — no refresh needed</div>
+        <div class="feature"><div class="feature-dot"></div>Filter by meet, session, swimmer</div>
+        <div class="feature"><div class="feature-dot"></div>Instant video playback</div>
+        <div class="feature"><div class="feature-dot"></div>Manage roster &amp; meets</div>
+      </div>
+      <div class="card-cta">
+        Open Viewer <span class="arrow">→</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="status-dot green"></div>
+      MVP v0.1
+    </div>
+    <div class="status-sep"></div>
+    <div class="status-item">
+      <div class="status-dot yellow"></div>
+      Backend coming soon
+    </div>
+    <div class="status-sep"></div>
+    <div class="status-item">
+      <div class="status-dot green"></div>
+      Works on Chrome &amp; Edge
+    </div>
+  </div>
+
+  <div class="footer">
+    SWIMSYNC &nbsp;·&nbsp; DEMO MODE &nbsp;·&nbsp; lreymond4.github.io/SwimSync
+  </div>
+
+</div>
+
+</body>
+</html>
