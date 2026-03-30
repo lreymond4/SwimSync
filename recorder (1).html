@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SwimSync — Recorder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Barlow+Condensed:wght@300;400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #080a0d;
+  --surface:  #0f1218;
+  --surface2: #161b24;
+  --surface3: #1c2230;
+  --border:   #1f2733;
+  --border2:  #28333f;
+  --accent:   #00d4ff;
+  --accent2:  #007a94;
+  --red:      #ff3b3b;
+  --red2:     #cc1f1f;
+  --green:    #00e676;
+  --yellow:   #ffc947;
+  --orange:   #ff8c00;
+  --purple:   #b388ff;
+  --text:     #dde3ed;
+  --text2:    #7d8a9a;
+  --text3:    #404d5c;
+  --mono:    'DM Mono', monospace;
+  --display: 'Barlow Condensed', sans-serif;
+  --body:    'Barlow', sans-serif;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+
+body {
+  background:var(--bg); color:var(--text);
+  font-family:var(--body); min-height:100vh;
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+
+/* ── HEADER ──────────────────────────────────────────────── */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 24px; height:52px; flex-shrink:0;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  position:relative; z-index:100;
+}
+.logo {
+  font-family:var(--display); font-size:20px; font-weight:900;
+  letter-spacing:.06em; color:var(--text);
+  display:flex; align-items:center; gap:10px;
+}
+.logo-mark {
+  width:28px; height:28px; border-radius:4px;
+  background:var(--red); display:flex; align-items:center; justify-content:center;
+  font-size:14px; color:#fff; flex-shrink:0;
+}
+.logo-mark.recording { animation:recPulse 1s ease-in-out infinite; }
+@keyframes recPulse {
+  0%,100% { background:var(--red); box-shadow:0 0 0 0 rgba(255,59,59,.5); }
+  50%     { background:#ff6b6b;   box-shadow:0 0 0 6px rgba(255,59,59,0); }
+}
+
+.header-center {
+  position:absolute; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:12px;
+}
+.rec-timer {
+  font-family:var(--mono); font-size:22px; font-weight:500;
+  color:var(--red); letter-spacing:.08em;
+  display:none;
+}
+.rec-timer.active { display:block; }
+.rec-dot {
+  width:10px; height:10px; background:var(--red);
+  border-radius:50%; display:none;
+  animation:blink 1s step-end infinite;
+}
+.rec-dot.active { display:block; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.header-right { display:flex; align-items:center; gap:10px; }
+.conn-badge {
+  font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+  padding:3px 9px; border-radius:2px; display:flex; align-items:center; gap:5px;
+}
+.conn-badge.online  { color:var(--green);  background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.2); }
+.conn-badge.offline { color:var(--orange); background:rgba(255,140,0,.08);  border:1px solid rgba(255,140,0,.25); }
+.conn-badge .dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+
+.queue-badge {
+  font-family:var(--mono); font-size:10px; color:var(--yellow);
+  background:rgba(255,201,71,.08); border:1px solid rgba(255,201,71,.2);
+  padding:3px 9px; border-radius:2px; display:none; align-items:center; gap:5px;
+}
+.queue-badge.visible { display:flex; }
+
+/* ── LAYOUT ──────────────────────────────────────────────── */
+.app { display:flex; flex:1; overflow:hidden; height:calc(100vh - 52px); }
+
+/* ── LEFT — CAMERA + CONTROLS ───────────────────────────── */
+.left-col {
+  flex:1; display:flex; flex-direction:column;
+  border-right:1px solid var(--border); overflow:hidden;
+}
+
+/* CAMERA */
+.camera-wrap {
+  position:relative; background:#000; flex-shrink:0;
+  overflow:hidden;
+}
+.camera-wrap video,
+.camera-wrap canvas {
+  width:100%; display:block; max-height:54vh;
+  object-fit:cover; background:#000;
+}
+.camera-overlay {
+  position:absolute; inset:0; pointer-events:none;
+}
+/* corner brackets */
+.corner {
+  position:absolute; width:22px; height:22px;
+  border-color:rgba(0,212,255,.5); border-style:solid;
+}
+.corner.tl { top:12px; left:12px; border-width:2px 0 0 2px; }
+.corner.tr { top:12px; right:12px; border-width:2px 2px 0 0; }
+.corner.bl { bottom:12px; left:12px; border-width:0 0 2px 2px; }
+.corner.br { bottom:12px; right:12px; border-width:0 2px 2px 0; }
+
+.rec-indicator {
+  position:absolute; top:12px; left:50%; transform:translateX(-50%);
+  display:none; align-items:center; gap:6px;
+  background:rgba(255,59,59,.85); backdrop-filter:blur(4px);
+  padding:4px 12px; border-radius:3px;
+  font-family:var(--mono); font-size:11px; color:#fff; letter-spacing:.1em;
+}
+.rec-indicator.active { display:flex; }
+.rec-indicator .dot { width:6px; height:6px; background:#fff; border-radius:50%; animation:blink 1s step-end infinite; }
+
+.no-camera {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:42vh; gap:14px; background:var(--surface);
+  border-bottom:1px solid var(--border);
+}
+.no-camera-icon { font-size:42px; opacity:.2; }
+.no-camera-text { font-family:var(--display); font-size:15px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text3); }
+.no-camera-sub  { font-size:13px; color:var(--text3); text-align:center; max-width:260px; line-height:1.5; }
+
+/* CAMERA BAR */
+.camera-bar {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 16px; border-bottom:1px solid var(--border);
+  background:var(--surface); flex-shrink:0;
+}
+.camera-bar label {
+  font-family:var(--mono); font-size:10px; color:var(--text3);
+  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap;
+}
+.camera-bar select {
+  flex:1; background:var(--surface2); border:1px solid var(--border2);
+  color:var(--text); font-family:var(--body); font-size:12px;
+  padding:5px 28px 5px 9px; border-radius:3px; outline:none; cursor:pointer; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23404d5c'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 9px center;
+}
+.camera-bar select:focus { border-color:var(--accent); }
+
+.btn-cam {
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+  padding:5px 12px; border-radius:3px; border:1px solid var(--border2);
+  background:var(--surface2); color:var(--text2); cursor:pointer; white-space:nowrap;
+  transition:all .15s;
+}
+.btn-cam:hover { border-color:var(--accent); color:var(--accent); }
+
+/* RECORD BUTTON AREA */
+.rec-area {
+  padding:16px 20px; border-bottom:1px solid var(--border);
+  background:var(--surface); flex-shrink:0;
+  display:flex; align-items:center; gap:16px;
+}
+
+.btn-record {
+  font-family:var(--display); font-size:16px; font-weight:900;
+  letter-spacing:.1em; text-transform:uppercase;
+  width:160px; height:52px; border-radius:5px; border:none;
+  cursor:pointer; transition:all .15s; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.btn-record.idle {
+  background:var(--red); color:#fff;
+  box-shadow:0 0 0 0 rgba(255,59,59,0);
+}
+.btn-record.idle:hover {
+  background:#ff5555;
+  box-shadow:0 4px 20px rgba(255,59,59,.35);
+}
+.btn-record.recording {
+  background:var(--surface3); color:var(--red);
+  border:2px solid var(--red);
+  animation:recBorder 1s ease-in-out infinite;
+}
+@keyframes recBorder {
+  0%,100% { border-color:var(--red); }
+  50%     { border-color:rgba(255,59,59,.3); }
+}
+.btn-record .rec-sq {
+  width:12px; height:12px; background:currentColor; border-radius:2px;
+  display:none;
+}
+.btn-record.recording .rec-sq { display:block; }
+.btn-record.recording .rec-circle { display:none; }
+.rec-circle {
+  width:12px; height:12px; background:#fff; border-radius:50%;
+}
+
+.rec-status {
+  flex:1; display:flex; flex-direction:column; gap:4px;
+}
+.rec-status-label {
+  font-family:var(--mono); font-size:10px; color:var(--text3);
+  letter-spacing:.1em; text-transform:uppercase;
+}
+.rec-status-value {
+  font-family:var(--display); font-size:18px; font-weight:700;
+  color:var(--text); letter-spacing:.02em;
+}
+.rec-status-value.recording { color:var(--red); }
+
+/* UPLOAD PROGRESS */
+.upload-bar-wrap {
+  padding:0 20px 12px; background:var(--surface); flex-shrink:0;
+  display:none;
+}
+.upload-bar-wrap.visible { display:block; }
+.upload-bar-label {
+  font-family:var(--mono); font-size:10px; color:var(--text2);
+  letter-spacing:.08em; margin-bottom:5px;
+  display:flex; justify-content:space-between;
+}
+.upload-bar-track {
+  height:3px; background:var(--border2); border-radius:2px; overflow:hidden;
+}
+.upload-bar-fill {
+  height:100%; background:linear-gradient(90deg, var(--accent), var(--green));
+  border-radius:2px; width:0%; transition:width .3s ease;
+}
+
+/* CLIP QUEUE */
+.clip-queue {
+  flex:1; overflow-y:auto; padding:10px 0;
+  background:var(--bg);
+}
+.clip-queue::-webkit-scrollbar { width:3px; }
+.clip-queue::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+.queue-header {
+  padding:8px 18px 6px;
+  font-family:var(--mono); font-size:10px; color:var(--text3);
+  letter-spacing:.1em; text-transform:uppercase;
+  display:flex; justify-content:space-between;
+}
+
+.queue-item {
+  padding:10px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:12px;
+  transition:background .1s;
+}
+.queue-item:hover { background:var(--surface); }
+
+.qi-status {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0;
+}
+.qi-status.uploaded { background:var(--green); }
+.qi-status.uploading { background:var(--accent); animation:blink .8s step-end infinite; }
+.qi-status.queued   { background:var(--yellow); }
+.qi-status.local    { background:var(--text3); }
+
+.qi-info { flex:1; min-width:0; }
+.qi-event {
+  font-family:var(--display); font-size:14px; font-weight:700;
+  color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.qi-swimmer { font-size:12px; color:var(--accent); }
+.qi-meta    { font-family:var(--mono); font-size:10px; color:var(--text3); margin-top:2px; }
+
+.qi-badge {
+  font-family:var(--mono); font-size:9px; letter-spacing:.06em;
+  padding:2px 7px; border-radius:2px; white-space:nowrap; flex-shrink:0;
+}
+.qi-badge.uploaded  { background:rgba(0,230,118,.12); color:var(--green); }
+.qi-badge.uploading { background:rgba(0,212,255,.12);  color:var(--accent); }
+.qi-badge.queued    { background:rgba(255,201,71,.12); color:var(--yellow); }
+.qi-badge.local     { background:rgba(64,77,92,.2);    color:var(--text3); }
+
+.queue-empty {
+  padding:30px 18px; text-align:center;
+  font-family:var(--mono); font-size:11px; color:var(--text3); line-height:2;
+}
+
+/* ── RIGHT — TAGGING FORM ───────────────────────────────── */
+.right-col {
+  width:340px; min-width:340px;
+  display:flex; flex-direction:column;
+  background:var(--surface); overflow:hidden;
+}
+
+.form-header {
+  padding:14px 20px; border-bottom:1px solid var(--border); flex-shrink:0;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.form-title {
+  font-family:var(--display); font-size:15px; font-weight:800;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--text2);
+}
+.form-mode-tabs {
+  display:flex; gap:0;
+  background:var(--surface2); border:1px solid var(--border2);
+  border-radius:3px; overflow:hidden;
+}
+.mode-tab {
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+  padding:4px 10px; border:none; background:transparent;
+  color:var(--text3); cursor:pointer; transition:all .15s;
+}
+.mode-tab.active { background:var(--accent); color:#000; font-weight:500; }
+
+.form-body { flex:1; overflow-y:auto; padding:16px 20px; }
+.form-body::-webkit-scrollbar { width:3px; }
+.form-body::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* UPLOAD DROP ZONE */
+.drop-zone {
+  border:2px dashed var(--border2); border-radius:6px;
+  padding:24px 16px; text-align:center; cursor:pointer;
+  transition:all .15s; margin-bottom:16px; display:none;
+}
+.drop-zone.visible { display:block; }
+.drop-zone:hover, .drop-zone.dragover {
+  border-color:var(--accent); background:rgba(0,212,255,.04);
+}
+.drop-zone-icon { font-size:28px; opacity:.3; margin-bottom:8px; }
+.drop-zone-text {
+  font-family:var(--display); font-size:14px; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--text2); margin-bottom:4px;
+}
+.drop-zone-sub { font-size:12px; color:var(--text3); }
+.drop-zone input[type=file] { display:none; }
+
+.file-selected {
+  background:rgba(0,212,255,.06); border:1px solid rgba(0,212,255,.2);
+  border-radius:4px; padding:10px 12px; margin-bottom:14px;
+  display:none; align-items:center; gap:10px;
+}
+.file-selected.visible { display:flex; }
+.file-selected-name { font-size:13px; color:var(--accent); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.file-selected-size { font-family:var(--mono); font-size:10px; color:var(--text3); flex-shrink:0; }
+.btn-clear-file { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:0; transition:color .12s; }
+.btn-clear-file:hover { color:var(--red); }
+
+/* FORM FIELDS */
+.field-group { margin-bottom:14px; }
+.field-group label {
+  font-family:var(--mono); font-size:10px; color:var(--text3);
+  letter-spacing:.1em; text-transform:uppercase; display:block; margin-bottom:5px;
+}
+.field-group label .req { color:var(--red); margin-left:2px; }
+
+.field-group input,
+.field-group select,
+.field-group textarea {
+  width:100%; background:var(--surface2); border:1px solid var(--border2);
+  color:var(--text); font-family:var(--body); font-size:13px;
+  padding:8px 11px; border-radius:4px; outline:none; transition:border-color .15s;
+  appearance:none;
+}
+.field-group select {
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23404d5c'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center;
+  padding-right:28px; cursor:pointer;
+}
+.field-group textarea { resize:vertical; min-height:64px; font-size:12px; }
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus { border-color:var(--accent); }
+.field-group input::placeholder,
+.field-group textarea::placeholder { color:var(--text3); }
+.field-group input.error,
+.field-group select.error { border-color:var(--red); }
+
+.field-row { display:flex; gap:10px; }
+.field-row .field-group { flex:1; }
+
+.field-hint {
+  font-family:var(--mono); font-size:10px; color:var(--text3); margin-top:4px;
+}
+
+/* section divider */
+.form-section {
+  font-family:var(--mono); font-size:10px; color:var(--text3);
+  letter-spacing:.1em; text-transform:uppercase;
+  padding:10px 0 8px; border-bottom:1px solid var(--border);
+  margin-bottom:14px;
+}
+
+/* SUBMIT */
+.form-footer {
+  padding:14px 20px; border-top:1px solid var(--border); flex-shrink:0;
+  display:flex; flex-direction:column; gap:8px;
+}
+
+.btn-submit {
+  font-family:var(--display); font-size:16px; font-weight:900;
+  letter-spacing:.1em; text-transform:uppercase;
+  width:100%; height:48px; border-radius:4px; border:none; cursor:pointer;
+  transition:all .15s; display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.btn-submit.live {
+  background:var(--red); color:#fff;
+}
+.btn-submit.live:hover { background:#ff5555; box-shadow:0 4px 20px rgba(255,59,59,.3); }
+.btn-submit.upload-mode {
+  background:var(--accent); color:#000;
+}
+.btn-submit.upload-mode:hover { background:#33ddff; }
+.btn-submit:disabled { opacity:.4; cursor:not-allowed; box-shadow:none; }
+
+.btn-submit-secondary {
+  font-family:var(--mono); font-size:11px; color:var(--text3);
+  background:none; border:none; cursor:pointer; text-align:center;
+  letter-spacing:.06em; transition:color .12s; padding:4px;
+}
+.btn-submit-secondary:hover { color:var(--text2); }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--surface2); border:1px solid var(--border2);
+  border-radius:5px; padding:10px 20px;
+  font-family:var(--mono); font-size:12px; color:var(--text);
+  display:flex; align-items:center; gap:8px;
+  opacity:0; transition:all .25s; z-index:999; white-space:nowrap;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.success { border-color:rgba(0,230,118,.3); }
+.toast.error   { border-color:rgba(255,59,59,.3); }
+.toast-dot { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
+.toast.error .toast-dot { background:var(--red); }
+
+/* MODAL for confirm-stop */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:400;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal {
+  background:var(--surface); border:1px solid var(--border2); border-radius:8px;
+  width:400px; max-width:95vw; padding:28px 28px 24px;
+  transform:translateY(10px); transition:transform .2s;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);
+}
+.modal-overlay.open .modal { transform:translateY(0); }
+.modal-title {
+  font-family:var(--display); font-size:20px; font-weight:800; letter-spacing:.04em; margin-bottom:10px;
+}
+.modal-body-text { font-size:14px; color:var(--text2); line-height:1.6; margin-bottom:22px; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+.btn-modal {
+  font-family:var(--display); font-size:13px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; padding:8px 18px; border-radius:3px; border:none; cursor:pointer; transition:all .15s;
+}
+.btn-modal.cancel { background:var(--surface2); color:var(--text2); border:1px solid var(--border2); }
+.btn-modal.cancel:hover { border-color:var(--text2); }
+.btn-modal.confirm { background:var(--red); color:#fff; }
+.btn-modal.confirm:hover { background:#ff5555; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark" id="logoMark">●</div>
+    SWIMSYNC
+    <span style="font-weight:300;color:var(--text3);font-size:14px;letter-spacing:.02em">/ RECORDER</span>
+  </div>
+  <div class="header-center">
+    <div class="rec-dot" id="recDot"></div>
+    <div class="rec-timer" id="recTimer">00:00</div>
+  </div>
+  <div class="header-right">
+    <div class="queue-badge" id="queueBadge">
+      <span>↑</span> <span id="queueCount">0</span> queued
+    </div>
+    <div class="conn-badge online" id="connBadge">
+      <div class="dot"></div>
+      <span id="connLabel">ONLINE</span>
+    </div>
+  </div>
+</header>
+
+<!-- APP -->
+<div class="app">
+
+  <!-- LEFT COL -->
+  <div class="left-col">
+
+    <!-- Camera preview -->
+    <div id="cameraContainer">
+      <div class="no-camera" id="noCameraMsg">
+        <div class="no-camera-icon">📷</div>
+        <div class="no-camera-text">No camera connected</div>
+        <div class="no-camera-sub">Select a camera source below and click Start Preview</div>
+      </div>
+    </div>
+
+    <!-- Camera controls -->
+    <div class="camera-bar">
+      <label>CAM</label>
+      <select id="cameraSelect">
+        <option value="">— Select camera —</option>
+      </select>
+      <button class="btn-cam" id="btnStartPreview" onclick="startPreview()">Start Preview</button>
+      <button class="btn-cam" id="btnStopPreview" onclick="stopPreview()" style="display:none">Stop</button>
+    </div>
+
+    <!-- Record button -->
+    <div class="rec-area">
+      <button class="btn-record idle" id="btnRecord" onclick="toggleRecord()">
+        <div class="rec-circle"></div>
+        <div class="rec-sq"></div>
+        <span id="btnRecordLabel">RECORD</span>
+      </button>
+      <div class="rec-status">
+        <div class="rec-status-label">Status</div>
+        <div class="rec-status-value" id="recStatusValue">Ready</div>
+      </div>
+    </div>
+
+    <!-- Upload progress -->
+    <div class="upload-bar-wrap" id="uploadBarWrap">
+      <div class="upload-bar-label">
+        <span id="uploadBarLabel">Uploading clip…</span>
+        <span id="uploadBarPct">0%</span>
+      </div>
+      <div class="upload-bar-track">
+        <div class="upload-bar-fill" id="uploadBarFill"></div>
+      </div>
+    </div>
+
+    <!-- Clip queue -->
+    <div class="clip-queue">
+      <div class="queue-header">
+        <span>Recent Clips</span>
+        <span id="clipCount">0 clips</span>
+      </div>
+      <div id="queueList">
+        <div class="queue-empty">No clips yet.<br>Record or upload a clip<br>to see it here.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT COL — TAGGING FORM -->
+  <div class="right-col">
+    <div class="form-header">
+      <div class="form-title">Tag Clip</div>
+      <div class="form-mode-tabs">
+        <button class="mode-tab active" id="tabLive"   onclick="setMode('live')">LIVE</button>
+        <button class="mode-tab"        id="tabUpload" onclick="setMode('upload')">UPLOAD</button>
+      </div>
+    </div>
+
+    <div class="form-body" id="formBody">
+
+      <!-- UPLOAD mode file picker -->
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <input type="file" id="fileInput" accept="video/*" onchange="onFileSelected(event)"/>
+        <div class="drop-zone-icon">🎬</div>
+        <div class="drop-zone-text">Drop video file here</div>
+        <div class="drop-zone-sub">or click to browse · MP4, MOV, AVI</div>
+      </div>
+
+      <div class="file-selected" id="fileSelectedBar">
+        <span class="file-selected-name" id="fileSelectedName"></span>
+        <span class="file-selected-size" id="fileSelectedSize"></span>
+        <button class="btn-clear-file" onclick="clearFile()">✕</button>
+      </div>
+
+      <!-- REQUIRED FIELDS -->
+      <div class="form-section">Required</div>
+
+      <div class="field-group">
+        <label>Swimmer(s) <span class="req">*</span></label>
+        <select id="fSwimmer">
+          <option value="">— Select swimmer —</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label>Event <span class="req">*</span></label>
+        <select id="fEvent">
+          <option value="">— Select event —</option>
+          <optgroup label="Freestyle">
+            <option>50 Freestyle</option>
+            <option>100 Freestyle</option>
+            <option>200 Freestyle</option>
+            <option>400 Freestyle</option>
+            <option>800 Freestyle</option>
+            <option>1500 Freestyle</option>
+          </optgroup>
+          <optgroup label="Backstroke">
+            <option>50 Backstroke</option>
+            <option>100 Backstroke</option>
+            <option>200 Backstroke</option>
+          </optgroup>
+          <optgroup label="Breaststroke">
+            <option>50 Breaststroke</option>
+            <option>100 Breaststroke</option>
+            <option>200 Breaststroke</option>
+          </optgroup>
+          <optgroup label="Butterfly">
+            <option>50 Butterfly</option>
+            <option>100 Butterfly</option>
+            <option>200 Butterfly</option>
+          </optgroup>
+          <optgroup label="IM">
+            <option>200 IM</option>
+            <option>400 IM</option>
+          </optgroup>
+          <optgroup label="Relay">
+            <option>4x50 Freestyle Relay</option>
+            <option>4x100 Freestyle Relay</option>
+            <option>4x200 Freestyle Relay</option>
+            <option>4x100 Medley Relay</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>Heat <span class="req">*</span></label>
+          <select id="fHeat">
+            <option value="">—</option>
+            <option>1</option><option>2</option><option>3</option>
+            <option>4</option><option>5</option><option>6</option>
+            <option>7</option><option>8</option><option>9</option><option>10</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Lane <span class="req">*</span></label>
+          <select id="fLane">
+            <option value="">—</option>
+            <option>1</option><option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- OPTIONAL FIELDS -->
+      <div class="form-section">Meet Info</div>
+
+      <div class="field-group">
+        <label>Meet</label>
+        <select id="fMeet" onchange="onMeetChange()">
+          <option value="">— No meet —</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label>Session</label>
+        <select id="fSession">
+          <option value="">— No session —</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label>Date</label>
+        <input type="date" id="fDate"/>
+        <div class="field-hint">Auto-filled with today's date</div>
+      </div>
+
+      <div class="form-section">Notes</div>
+
+      <div class="field-group">
+        <label>Notes</label>
+        <textarea id="fNotes" placeholder="e.g. Watch start reaction, compare turn to last week…"></textarea>
+      </div>
+
+    </div><!-- /form-body -->
+
+    <div class="form-footer">
+      <button class="btn-submit live" id="btnSubmit" onclick="submitClip()">
+        <span id="submitIcon">⬆</span>
+        <span id="submitLabel">Save &amp; Upload</span>
+      </button>
+      <button class="btn-submit-secondary" onclick="saveLocal()">Save locally only (no upload)</button>
+    </div>
+
+  </div><!-- /right-col -->
+</div>
+
+<!-- STOP-CONFIRM MODAL -->
+<div class="modal-overlay" id="stopModal">
+  <div class="modal">
+    <div class="modal-title">Stop recording?</div>
+    <div class="modal-body-text">
+      This will stop the current recording and prepare the clip for tagging and upload.
+      You can tag it now or come back to it later.
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal cancel" onclick="closeStopModal()">Keep recording</button>
+      <button class="btn-modal confirm" onclick="confirmStopRecord()">Stop &amp; Tag</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-dot"></div>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// ROSTER (shared with Viewer — loaded from localStorage)
+// ══════════════════════════════════════════════════════════════
+let roster = {
+  swimmers: ["Marcus Chen","Priya Nair","Jordan Walsh","Sofia Reyes","Theo Park"],
+  meets: [
+    { id:'m1', name:"State Qualifier 2025", date:"2025-03-28", sessions:["Morning Session","Afternoon Session"] },
+    { id:'m2', name:"Invitational March",   date:"2025-03-15", sessions:["Session A","Session B"] }
+  ]
+};
+
+function loadRoster() {
+  try {
+    const s = localStorage.getItem('swimsync_roster');
+    if (s) roster = JSON.parse(s);
+  } catch(e){}
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let mode = 'live';           // 'live' | 'upload'
+let mediaStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let recStartTime = null;
+let recTimerInterval = null;
+let currentBlob = null;
+let selectedFile = null;
+let isOnline = navigator.onLine;
+let uploadQueue = [];        // [{blob, meta, id, status}]
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  loadRoster();
+  populateFormRoster();
+  setTodayDate();
+  enumerateCameras();
+  setMode('live');
+  loadQueue();
+  renderQueue();
+});
+
+window.addEventListener('online',  () => { isOnline=true;  updateConnBadge(); processQueue(); });
+window.addEventListener('offline', () => { isOnline=false; updateConnBadge(); });
+
+function updateConnBadge() {
+  const b = document.getElementById('connBadge');
+  const l = document.getElementById('connLabel');
+  b.className = 'conn-badge ' + (isOnline ? 'online' : 'offline');
+  l.textContent = isOnline ? 'ONLINE' : 'OFFLINE';
+}
+
+function setTodayDate() {
+  const d = new Date().toISOString().split('T')[0];
+  document.getElementById('fDate').value = d;
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORM POPULATION
+// ══════════════════════════════════════════════════════════════
+function populateFormRoster() {
+  const swimSel = document.getElementById('fSwimmer');
+  const cur = swimSel.value;
+  swimSel.innerHTML = '<option value="">— Select swimmer —</option>';
+  [...roster.swimmers].sort().forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    if (s === cur) o.selected = true;
+    swimSel.appendChild(o);
+  });
+
+  const meetSel = document.getElementById('fMeet');
+  const curMeet = meetSel.value;
+  meetSel.innerHTML = '<option value="">— No meet —</option>';
+  roster.meets.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.name; o.textContent = m.name;
+    if (m.name === curMeet) o.selected = true;
+    meetSel.appendChild(o);
+  });
+}
+
+function onMeetChange() {
+  const meetName = document.getElementById('fMeet').value;
+  const sessSel  = document.getElementById('fSession');
+  sessSel.innerHTML = '<option value="">— No session —</option>';
+  if (meetName) {
+    const meet = roster.meets.find(m => m.name === meetName);
+    if (meet) meet.sessions.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s; o.textContent = s; sessSel.appendChild(o);
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// MODE TOGGLE
+// ══════════════════════════════════════════════════════════════
+function setMode(m) {
+  mode = m;
+  document.getElementById('tabLive').classList.toggle('active',   m==='live');
+  document.getElementById('tabUpload').classList.toggle('active', m==='upload');
+
+  const dropZone = document.getElementById('dropZone');
+  const submitBtn = document.getElementById('btnSubmit');
+  const recArea = document.querySelector('.rec-area');
+  const camBar  = document.querySelector('.camera-bar');
+
+  dropZone.classList.toggle('visible', m==='upload');
+
+  if (m === 'live') {
+    submitBtn.className = 'btn-submit live';
+    document.getElementById('submitLabel').textContent = 'Save & Upload';
+    submitBtn.disabled = false;
+  } else {
+    submitBtn.className = 'btn-submit upload-mode';
+    document.getElementById('submitLabel').textContent = 'Tag & Upload File';
+    submitBtn.disabled = !selectedFile;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// CAMERA
+// ══════════════════════════════════════════════════════════════
+async function enumerateCameras() {
+  try {
+    // Step 1: request permission — this gives us real deviceIds and labels
+    const permStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    permStream.getTracks().forEach(t => t.stop()); // release immediately
+
+    // Step 2: now enumerate — IDs and labels will be populated
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+    const sel = document.getElementById('cameraSelect');
+    sel.innerHTML = '<option value="">— Select camera —</option>';
+    videoDevices.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = d.label || `Camera ${i + 1}`;
+      sel.appendChild(o);
+    });
+
+    if (videoDevices.length === 1) {
+      // Only one camera — auto-select it and start preview immediately
+      sel.selectedIndex = 1;
+      showToast(`Camera found: ${videoDevices[0].label || 'Camera 1'} — starting preview…`, 'success');
+      await startPreview();
+    } else if (videoDevices.length > 1) {
+      sel.selectedIndex = 1; // pre-select first camera, user can change
+      showToast(`${videoDevices.length} cameras found — select one and click Start Preview`, 'success');
+    } else {
+      showToast('No cameras detected', 'error');
+    }
+  } catch(e) {
+    if (e.name === 'NotAllowedError') {
+      showToast('Camera permission denied — please allow access in your browser', 'error');
+    } else {
+      showToast('Camera error: ' + e.message, 'error');
+    }
+    console.warn('Camera enumeration failed:', e);
+  }
+}
+
+async function startPreview() {
+  const sel = document.getElementById('cameraSelect');
+  const deviceId = sel.value;
+
+  // Build constraints — if we have a real deviceId use it, otherwise fall back to any camera
+  let videoConstraints;
+  if (deviceId && deviceId !== '') {
+    videoConstraints = { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } };
+  } else {
+    // No specific device selected — just use whatever camera is available
+    videoConstraints = { width: { ideal: 1280 }, height: { ideal: 720 } };
+  }
+
+  try {
+    if (mediaStream) stopPreview();
+    const constraints = { video: videoConstraints, audio: true };
+    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    // After successfully getting stream, re-enumerate to make sure dropdown is accurate
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    if (sel.options.length <= 1 && videoDevices.length > 0) {
+      sel.innerHTML = '<option value="">— Select camera —</option>';
+      videoDevices.forEach((d, i) => {
+        const o = document.createElement('option');
+        o.value = d.deviceId;
+        o.textContent = d.label || `Camera ${i + 1}`;
+        sel.appendChild(o);
+      });
+      sel.selectedIndex = 1;
+    }
+
+    const container = document.getElementById('cameraContainer');
+    container.innerHTML = `
+      <div class="camera-wrap" id="cameraWrap">
+        <video id="previewVideo" autoplay muted playsinline></video>
+        <div class="camera-overlay">
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+          <div class="rec-indicator" id="recIndicator">
+            <div class="dot"></div> REC
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('previewVideo').srcObject = mediaStream;
+    document.getElementById('btnStartPreview').style.display = 'none';
+    document.getElementById('btnStopPreview').style.display  = '';
+    document.getElementById('btnRecord').disabled = false;
+    setRecStatus('Preview active', false);
+  } catch(e) {
+    if (e.name === 'NotAllowedError') {
+      showToast('Camera permission denied — allow access in browser settings', 'error');
+    } else if (e.name === 'NotFoundError') {
+      showToast('Camera not found — is it plugged in?', 'error');
+    } else {
+      showToast('Could not start camera: ' + e.message, 'error');
+    }
+    console.warn('startPreview failed:', e);
+  }
+}
+
+function stopPreview() {
+  if (isRecording) { showToast('Stop recording first', 'error'); return; }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  const container = document.getElementById('cameraContainer');
+  container.innerHTML = `
+    <div class="no-camera" id="noCameraMsg">
+      <div class="no-camera-icon">📷</div>
+      <div class="no-camera-text">No camera connected</div>
+      <div class="no-camera-sub">Select a camera source below and click Start Preview</div>
+    </div>`;
+  document.getElementById('btnStartPreview').style.display = '';
+  document.getElementById('btnStopPreview').style.display  = 'none';
+  setRecStatus('Ready', false);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RECORDING
+// ══════════════════════════════════════════════════════════════
+function toggleRecord() {
+  if (!isRecording) startRecord();
+  else document.getElementById('stopModal').classList.add('open');
+}
+
+function startRecord() {
+  if (!mediaStream) { showToast('Start camera preview first', 'error'); return; }
+
+  recordedChunks = [];
+  const mimeType = getSupportedMimeType();
+  mediaRecorder = new MediaRecorder(mediaStream, { mimeType, videoBitsPerSecond: 4000000 });
+
+  mediaRecorder.ondataavailable = e => {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+  };
+  mediaRecorder.onstop = () => {
+    currentBlob = new Blob(recordedChunks, { type: mimeType });
+    setRecStatus('Clip ready — tag & upload', false);
+  };
+
+  mediaRecorder.start(1000); // collect data every 1s
+  isRecording = true;
+  recStartTime = Date.now();
+  recTimerInterval = setInterval(updateRecTimer, 500);
+
+  // UI
+  const btn = document.getElementById('btnRecord');
+  btn.className = 'btn-record recording';
+  document.getElementById('btnRecordLabel').textContent = 'STOP';
+  document.getElementById('recDot').classList.add('active');
+  document.getElementById('recTimer').classList.add('active');
+  document.getElementById('logoMark').classList.add('recording');
+  document.getElementById('recIndicator')?.classList.add('active');
+  setRecStatus('● Recording', true);
+}
+
+function closeStopModal() {
+  document.getElementById('stopModal').classList.remove('open');
+}
+
+function confirmStopRecord() {
+  closeStopModal();
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+  mediaRecorder.stop();
+  isRecording = false;
+  clearInterval(recTimerInterval);
+
+  document.getElementById('recDot').classList.remove('active');
+  document.getElementById('recTimer').classList.remove('active');
+  document.getElementById('logoMark').classList.remove('recording');
+  document.getElementById('recIndicator')?.classList.remove('active');
+
+  const btn = document.getElementById('btnRecord');
+  btn.className = 'btn-record idle';
+  document.getElementById('btnRecordLabel').textContent = 'RECORD';
+  showToast('Recording stopped — fill in tags and upload', 'success');
+}
+
+function updateRecTimer() {
+  const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+  const m = String(Math.floor(elapsed/60)).padStart(2,'0');
+  const s = String(elapsed%60).padStart(2,'0');
+  document.getElementById('recTimer').textContent = m+':'+s;
+}
+
+function setRecStatus(text, isRec) {
+  const el = document.getElementById('recStatusValue');
+  el.textContent = text;
+  el.className = 'rec-status-value' + (isRec ? ' recording' : '');
+}
+
+function getSupportedMimeType() {
+  const types = [
+    'video/webm;codecs=h264',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+    'video/mp4',
+  ];
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+}
+
+// ══════════════════════════════════════════════════════════════
+// FILE UPLOAD MODE
+// ══════════════════════════════════════════════════════════════
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('dragover');
+}
+function onDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('dragover');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('video/')) applyFile(file);
+  else showToast('Please drop a video file', 'error');
+}
+function onFileSelected(e) {
+  const file = e.target.files[0];
+  if (file) applyFile(file);
+}
+function applyFile(file) {
+  selectedFile = file;
+  document.getElementById('fileSelectedName').textContent = file.name;
+  document.getElementById('fileSelectedSize').textContent = formatBytes(file.size);
+  document.getElementById('fileSelectedBar').classList.add('visible');
+  document.getElementById('dropZone').style.display = 'none';
+  document.getElementById('btnSubmit').disabled = false;
+  showToast(`File loaded: ${file.name}`, 'success');
+}
+function clearFile() {
+  selectedFile = null;
+  document.getElementById('fileSelectedBar').classList.remove('visible');
+  document.getElementById('dropZone').style.display = '';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('btnSubmit').disabled = true;
+}
+function formatBytes(b) {
+  if (b < 1024*1024) return (b/1024).toFixed(1)+' KB';
+  return (b/1024/1024).toFixed(1)+' MB';
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORM VALIDATION & SUBMIT
+// ══════════════════════════════════════════════════════════════
+function getFormData() {
+  return {
+    swimmer: document.getElementById('fSwimmer').value,
+    event:   document.getElementById('fEvent').value,
+    heat:    document.getElementById('fHeat').value,
+    lane:    document.getElementById('fLane').value,
+    meet:    document.getElementById('fMeet').value,
+    session: document.getElementById('fSession').value,
+    date:    document.getElementById('fDate').value || new Date().toISOString().split('T')[0],
+    notes:   document.getElementById('fNotes').value.trim(),
+    stroke:  inferStroke(document.getElementById('fEvent').value),
+    distance: inferDistance(document.getElementById('fEvent').value),
+  };
+}
+
+function inferStroke(event) {
+  if (!event) return '';
+  if (event.includes('Freestyle')) return 'Freestyle';
+  if (event.includes('Backstroke')) return 'Backstroke';
+  if (event.includes('Breaststroke')) return 'Breaststroke';
+  if (event.includes('Butterfly')) return 'Butterfly';
+  if (event.includes('IM')) return 'IM';
+  if (event.includes('Relay')) return 'Relay';
+  return '';
+}
+function inferDistance(event) {
+  if (!event) return '';
+  const m = event.match(/^(\d+)/);
+  return m ? m[1]+'m' : '';
+}
+
+function validateForm(data) {
+  let ok = true;
+  ['fSwimmer','fEvent','fHeat','fLane'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el.value) { el.classList.add('error'); ok = false; }
+    else el.classList.remove('error');
+  });
+  return ok;
+}
+
+async function submitClip() {
+  const data = getFormData();
+  if (!validateForm(data)) {
+    showToast('Please fill in required fields', 'error'); return;
+  }
+
+  const blob = mode === 'live' ? currentBlob : (selectedFile ? selectedFile : null);
+
+  if (mode === 'live' && !blob) {
+    showToast('No recording found. Record a clip first.', 'error'); return;
+  }
+  if (mode === 'upload' && !blob) {
+    showToast('No file selected.', 'error'); return;
+  }
+
+  const id = 'clip_' + Date.now();
+  const item = { id, meta: data, blob, status: isOnline ? 'uploading' : 'queued', uploadedAt: new Date() };
+  uploadQueue.unshift(item);
+  saveQueue();
+  renderQueue();
+
+  if (isOnline) {
+    await simulateUpload(item);
+  } else {
+    showToast('Saved locally — will upload when online', 'success');
+    updateQueueBadge();
+  }
+
+  resetForm();
+}
+
+function saveLocal() {
+  const data = getFormData();
+  if (!validateForm(data)) {
+    showToast('Please fill in required fields', 'error'); return;
+  }
+  const blob = mode === 'live' ? currentBlob : selectedFile;
+  const id = 'clip_' + Date.now();
+  const item = { id, meta: data, blob, status: 'local', uploadedAt: new Date() };
+  uploadQueue.unshift(item);
+  saveQueue();
+  renderQueue();
+  showToast('Saved locally', 'success');
+  resetForm();
+}
+
+function resetForm() {
+  document.getElementById('fSwimmer').value = '';
+  document.getElementById('fEvent').value   = '';
+  document.getElementById('fHeat').value    = '';
+  document.getElementById('fLane').value    = '';
+  document.getElementById('fNotes').value   = '';
+  currentBlob  = null;
+  if (mode === 'upload') clearFile();
+  setRecStatus('Ready', false);
+}
+
+// ══════════════════════════════════════════════════════════════
+// UPLOAD SIMULATION (replace with real fetch to backend)
+// ══════════════════════════════════════════════════════════════
+async function simulateUpload(item) {
+  // In production, replace with real upload:
+  // const formData = new FormData();
+  // formData.append('video', item.blob, item.id+'.webm');
+  // formData.append('meta', JSON.stringify(item.meta));
+  // await fetch('/api/clips', { method:'POST', body: formData });
+
+  const wrap = document.getElementById('uploadBarWrap');
+  const fill = document.getElementById('uploadBarFill');
+  const pct  = document.getElementById('uploadBarPct');
+  const lbl  = document.getElementById('uploadBarLabel');
+
+  wrap.classList.add('visible');
+  lbl.textContent = `Uploading ${item.meta.event} — ${item.meta.swimmer}…`;
+
+  let progress = 0;
+  item.status = 'uploading';
+  renderQueue();
+
+  await new Promise(resolve => {
+    const interval = setInterval(() => {
+      progress += Math.random() * 18 + 5;
+      if (progress >= 100) { progress = 100; clearInterval(interval); resolve(); }
+      fill.style.width = progress + '%';
+      pct.textContent  = Math.round(progress) + '%';
+    }, 200);
+  });
+
+  item.status = 'uploaded';
+  saveQueue();
+  renderQueue();
+  wrap.classList.remove('visible');
+  fill.style.width = '0%';
+  showToast(`✓ ${item.meta.event} uploaded successfully`, 'success');
+  updateQueueBadge();
+}
+
+async function processQueue() {
+  const pending = uploadQueue.filter(i => i.status === 'queued');
+  for (const item of pending) {
+    item.status = 'uploading';
+    renderQueue();
+    await simulateUpload(item);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// QUEUE PERSISTENCE
+// ══════════════════════════════════════════════════════════════
+function saveQueue() {
+  // Save metadata only (blobs can't be serialized)
+  try {
+    const meta = uploadQueue.map(i => ({
+      id: i.id, meta: i.meta, status: i.status,
+      uploadedAt: i.uploadedAt
+    }));
+    localStorage.setItem('swimsync_queue', JSON.stringify(meta));
+  } catch(e){}
+}
+function loadQueue() {
+  try {
+    const s = localStorage.getItem('swimsync_queue');
+    if (s) {
+      uploadQueue = JSON.parse(s).map(i => ({
+        ...i, blob: null, uploadedAt: new Date(i.uploadedAt)
+      }));
+    }
+  } catch(e){}
+}
+
+function updateQueueBadge() {
+  const queued = uploadQueue.filter(i => i.status === 'queued').length;
+  const badge = document.getElementById('queueBadge');
+  document.getElementById('queueCount').textContent = queued;
+  badge.classList.toggle('visible', queued > 0);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER QUEUE
+// ══════════════════════════════════════════════════════════════
+function renderQueue() {
+  const el = document.getElementById('queueList');
+  document.getElementById('clipCount').textContent = uploadQueue.length + ' clip' + (uploadQueue.length!==1?'s':'');
+  updateQueueBadge();
+
+  if (!uploadQueue.length) {
+    el.innerHTML = '<div class="queue-empty">No clips yet.<br>Record or upload a clip<br>to see it here.</div>';
+    return;
+  }
+
+  el.innerHTML = uploadQueue.map(item => {
+    const statusLabels = { uploaded:'UPLOADED', uploading:'UPLOADING…', queued:'QUEUED', local:'LOCAL' };
+    return `
+      <div class="queue-item">
+        <div class="qi-status ${item.status}"></div>
+        <div class="qi-info">
+          <div class="qi-event">${esc(item.meta.event||'—')}</div>
+          <div class="qi-swimmer">${esc(item.meta.swimmer||'—')}</div>
+          <div class="qi-meta">
+            ${item.meta.meet ? esc(item.meta.meet) + (item.meta.session ? ' · '+esc(item.meta.session) : '') : ''}
+            ${item.meta.heat ? ' HT'+item.meta.heat : ''}
+            ${item.meta.lane ? ' LN'+item.meta.lane : ''}
+            · ${timeAgo(item.uploadedAt)}
+          </div>
+        </div>
+        <div class="qi-badge ${item.status}">${statusLabels[item.status]||item.status}</div>
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════
+const esc = s => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const timeAgo = d => {
+  if (!d) return '—';
+  const s = Math.floor((Date.now()-new Date(d))/1000);
+  if (s<60)    return s+'s ago';
+  if (s<3600)  return Math.floor(s/60)+'m ago';
+  if (s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+};
+
+let toastTimeout;
+function showToast(msg, type='success') {
+  const t  = document.getElementById('toast');
+  const tm = document.getElementById('toastMsg');
+  clearTimeout(toastTimeout);
+  tm.textContent = msg;
+  t.className = 'toast show ' + type;
+  toastTimeout = setTimeout(() => { t.classList.remove('show'); }, 3200);
+}
+
+// Keyboard shortcut: Space to toggle record when in live mode
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && mode === 'live'
+      && document.activeElement.tagName !== 'INPUT'
+      && document.activeElement.tagName !== 'TEXTAREA'
+      && document.activeElement.tagName !== 'SELECT') {
+    e.preventDefault(); toggleRecord();
+  }
+});
+</script>
+</body>
+</html>

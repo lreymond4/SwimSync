@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SwimSync — Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #191d24;
+    --surface3: #1e2330;
+    --border: #252a33;
+    --border2: #2e3440;
+    --accent: #00d4ff;
+    --green: #00e676;
+    --yellow: #ffd740;
+    --red: #ff5252;
+    --purple: #b388ff;
+    --text: #e8eaf0;
+    --text2: #8a92a0;
+    --text3: #555d6b;
+    --mono: 'DM Mono', monospace;
+    --display: 'Barlow Condensed', sans-serif;
+    --body: 'Barlow', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ─────────────────────────────────────────── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px; height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 200; flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: var(--display); font-size: 22px; font-weight: 800;
+    letter-spacing: .04em; color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-dot {
+    width: 8px; height: 8px; background: var(--accent);
+    border-radius: 50%; box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; box-shadow:0 0 8px var(--accent); }
+    50%      { opacity:.5; box-shadow:0 0 3px var(--accent); }
+  }
+  @keyframes pulseGreen {
+    0%,100% { opacity:1; } 50% { opacity:.5; }
+  }
+
+  .header-right { display:flex; align-items:center; gap:12px; }
+
+  .live-badge {
+    display:flex; align-items:center; gap:6px;
+    font-family:var(--mono); font-size:11px; color:var(--green);
+    background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.2);
+    padding:4px 10px; border-radius:3px; letter-spacing:.08em;
+  }
+  .live-badge .dot {
+    width:6px; height:6px; background:var(--green);
+    border-radius:50%; animation:pulseGreen 1.5s infinite;
+  }
+  .user-badge {
+    font-family:var(--mono); font-size:11px; color:var(--text2);
+    background:var(--surface2); border:1px solid var(--border);
+    padding:4px 10px; border-radius:3px;
+  }
+  .btn-manage {
+    font-family:var(--display); font-size:13px; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase;
+    padding:6px 14px; border-radius:3px; border:1px solid var(--border2);
+    background:transparent; color:var(--text2); cursor:pointer; transition:all .15s;
+  }
+  .btn-manage:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* ── LAYOUT ─────────────────────────────────────────── */
+  .app { display:flex; flex:1; overflow:hidden; }
+
+  /* ── SIDEBAR ─────────────────────────────────────────── */
+  .sidebar {
+    width:300px; min-width:300px;
+    border-right:1px solid var(--border);
+    background:var(--surface);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .sidebar-header {
+    padding:16px 20px 12px; border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .sidebar-title {
+    font-family:var(--display); font-size:13px; font-weight:700;
+    letter-spacing:.12em; color:var(--text2); text-transform:uppercase; margin-bottom:12px;
+  }
+  .search-box { position:relative; }
+  .search-box input {
+    width:100%; background:var(--surface2); border:1px solid var(--border2);
+    color:var(--text); font-family:var(--body); font-size:13px;
+    padding:8px 12px 8px 34px; border-radius:4px; outline:none; transition:border-color .15s;
+  }
+  .search-box input:focus { border-color:var(--accent); }
+  .search-box input::placeholder { color:var(--text3); }
+  .search-icon {
+    position:absolute; left:10px; top:50%; transform:translateY(-50%);
+    color:var(--text3); font-size:13px;
+  }
+
+  /* FILTERS */
+  .filters {
+    padding:14px 20px; border-bottom:1px solid var(--border);
+    display:flex; flex-direction:column; gap:10px;
+    flex-shrink:0; overflow-y:auto; max-height:360px;
+  }
+  .filters::-webkit-scrollbar { width:3px; }
+  .filters::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  .filter-group label {
+    font-family:var(--mono); font-size:10px; color:var(--text3);
+    letter-spacing:.1em; text-transform:uppercase; display:block; margin-bottom:5px;
+  }
+  .filter-group select {
+    width:100%; background:var(--surface2); border:1px solid var(--border2);
+    color:var(--text); font-family:var(--body); font-size:12px;
+    padding:6px 28px 6px 10px; border-radius:4px; outline:none; cursor:pointer;
+    appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555d6b'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 10px center;
+  }
+  .filter-group select:focus { border-color:var(--accent); }
+
+  .filter-row { display:flex; gap:8px; }
+  .filter-row .filter-group { flex:1; }
+
+  .clear-filters {
+    font-family:var(--mono); font-size:10px; color:var(--accent);
+    background:none; border:none; cursor:pointer;
+    letter-spacing:.08em; text-align:left; padding:0; opacity:.7; transition:opacity .15s;
+  }
+  .clear-filters:hover { opacity:1; }
+  .active-filter-count {
+    display:inline-block; background:var(--accent); color:#000;
+    font-family:var(--mono); font-size:9px; font-weight:500;
+    padding:1px 5px; border-radius:2px; margin-left:6px;
+  }
+
+  /* CLIP LIST */
+  .clip-list { flex:1; overflow-y:auto; padding:8px 0; }
+  .clip-list::-webkit-scrollbar { width:4px; }
+  .clip-list::-webkit-scrollbar-track { background:transparent; }
+  .clip-list::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  .clip-item {
+    padding:12px 20px; cursor:pointer;
+    border-left:3px solid transparent;
+    transition:background .12s, border-color .12s;
+    border-bottom:1px solid var(--border);
+  }
+  .clip-item:hover { background:var(--surface2); }
+  .clip-item.active { background:rgba(0,212,255,.06); border-left-color:var(--accent); }
+  .clip-item.new-clip { animation:newClip 3s ease-out forwards; }
+  @keyframes newClip {
+    0%   { background:rgba(0,230,118,.15); }
+    100% { background:transparent; }
+  }
+
+  .clip-meta-top {
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;
+  }
+  .clip-event {
+    font-family:var(--display); font-size:15px; font-weight:700;
+    color:var(--text); letter-spacing:.02em;
+  }
+  .clip-time { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .clip-swimmer { font-size:13px; color:var(--accent); font-weight:500; margin-bottom:3px; }
+  .clip-meet-session {
+    font-size:11px; color:var(--text3); margin-bottom:5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .clip-tags { display:flex; gap:5px; flex-wrap:wrap; }
+  .tag {
+    font-family:var(--mono); font-size:10px;
+    padding:2px 7px; border-radius:2px; letter-spacing:.05em;
+  }
+  .tag-lane   { background:rgba(0,212,255,.10); color:var(--accent); }
+  .tag-heat   { background:rgba(255,215,64,.10); color:var(--yellow); }
+  .tag-stroke { background:rgba(0,230,118,.10); color:var(--green); }
+  .tag-new    { background:rgba(0,230,118,.20); color:var(--green); }
+  .tag-session{ background:rgba(179,136,255,.10); color:var(--purple); }
+
+  .no-results {
+    padding:40px 20px; text-align:center;
+    color:var(--text3); font-family:var(--mono); font-size:12px; line-height:1.8;
+  }
+
+  /* ── MAIN ────────────────────────────────────────────── */
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  .demo-notice {
+    margin:14px 28px 0; padding:9px 14px;
+    background:rgba(255,215,64,.06); border:1px solid rgba(255,215,64,.2);
+    border-radius:4px; font-family:var(--mono); font-size:11px; color:var(--yellow);
+    display:flex; align-items:center; gap:8px; flex-shrink:0;
+  }
+
+  /* PLAYER */
+  .player-section {
+    padding:16px 28px; border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .player-wrap {
+    position:relative; background:#000; border-radius:6px; overflow:hidden;
+    border:1px solid var(--border2); max-width:960px;
+  }
+  .player-wrap video { width:100%; display:block; max-height:420px; background:#000; }
+  .player-empty {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:260px; color:var(--text3); gap:12px;
+    max-width:960px; border:1px solid var(--border); border-radius:6px;
+  }
+  .player-empty-icon { font-size:36px; opacity:.3; }
+  .player-empty-text {
+    font-family:var(--display); font-size:15px; font-weight:600;
+    letter-spacing:.06em; text-transform:uppercase; opacity:.4;
+  }
+
+  /* CLIP INFO */
+  .clip-info {
+    max-width:960px; margin-top:14px;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:24px;
+  }
+  .clip-info-title {
+    font-family:var(--display); font-size:24px; font-weight:800;
+    letter-spacing:.03em; color:var(--text); line-height:1; margin-bottom:4px;
+  }
+  .clip-info-swimmer { font-size:14px; color:var(--accent); font-weight:500; margin-bottom:2px; }
+  .clip-info-meet    { font-size:12px; color:var(--text3); margin-bottom:6px; }
+  .clip-info-meta    { display:flex; gap:7px; flex-wrap:wrap; margin-top:6px; }
+  .meta-pill {
+    display:flex; align-items:center; gap:5px; padding:3px 9px; border-radius:3px;
+    font-family:var(--mono); font-size:11px;
+    background:var(--surface2); border:1px solid var(--border2); color:var(--text2);
+  }
+  .meta-pill span { color:var(--text3); }
+  .clip-notes { margin-top:8px; font-size:13px; color:var(--text2); font-style:italic; max-width:500px; }
+  .clip-timestamp { font-family:var(--mono); font-size:11px; color:var(--text3); }
+
+  /* STATS */
+  .stats-bar {
+    padding:12px 28px; display:flex; gap:24px;
+    border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .stat { display:flex; flex-direction:column; gap:2px; }
+  .stat-value {
+    font-family:var(--display); font-size:20px; font-weight:800;
+    color:var(--text); letter-spacing:.02em;
+  }
+  .stat-label {
+    font-family:var(--mono); font-size:10px;
+    color:var(--text3); letter-spacing:.1em; text-transform:uppercase;
+  }
+  .stat-divider { width:1px; background:var(--border); align-self:stretch; }
+
+  /* GRID */
+  .recent-section { flex:1; overflow-y:auto; padding:18px 28px; }
+  .recent-section::-webkit-scrollbar { width:4px; }
+  .recent-section::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  .section-title {
+    font-family:var(--display); font-size:12px; font-weight:700;
+    letter-spacing:.14em; color:var(--text3); text-transform:uppercase; margin-bottom:12px;
+  }
+  .clips-grid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px;
+  }
+  .grid-clip {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:5px; padding:13px; cursor:pointer;
+    transition:border-color .15s, transform .12s; position:relative; overflow:hidden;
+  }
+  .grid-clip::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:var(--accent); opacity:0; transition:opacity .15s;
+  }
+  .grid-clip:hover { border-color:var(--accent); transform:translateY(-1px); }
+  .grid-clip:hover::before, .grid-clip.active::before { opacity:1; }
+  .grid-clip.active { border-color:var(--accent); }
+  .grid-clip-event   { font-family:var(--display); font-size:15px; font-weight:700; color:var(--text); margin-bottom:2px; }
+  .grid-clip-swimmer { font-size:12px; color:var(--accent); margin-bottom:2px; }
+  .grid-clip-meet    {
+    font-size:10px; color:var(--text3); margin-bottom:7px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .grid-clip-bottom  { display:flex; align-items:center; justify-content:space-between; }
+  .grid-clip-tags    { display:flex; gap:4px; }
+  .grid-clip-time    { font-family:var(--mono); font-size:10px; color:var(--text3); }
+
+  /* ── MANAGE MODAL ────────────────────────────────────── */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:500;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  .modal-overlay.open { opacity:1; pointer-events:all; }
+  .modal {
+    background:var(--surface); border:1px solid var(--border2); border-radius:8px;
+    width:580px; max-width:95vw; max-height:85vh;
+    display:flex; flex-direction:column;
+    transform:translateY(12px); transition:transform .2s;
+    box-shadow:0 24px 60px rgba(0,0,0,.5);
+  }
+  .modal-overlay.open .modal { transform:translateY(0); }
+
+  .modal-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 22px 14px; border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .modal-title {
+    font-family:var(--display); font-size:18px; font-weight:800;
+    letter-spacing:.04em; color:var(--text);
+  }
+  .modal-close {
+    background:none; border:none; color:var(--text3);
+    font-size:20px; cursor:pointer; transition:color .15s; padding:4px;
+  }
+  .modal-close:hover { color:var(--text); }
+
+  .modal-tabs {
+    display:flex; border-bottom:1px solid var(--border); flex-shrink:0; padding:0 22px;
+  }
+  .modal-tab {
+    font-family:var(--display); font-size:13px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase;
+    padding:10px 16px; border:none; background:none; color:var(--text3);
+    cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; margin-bottom:-1px;
+  }
+  .modal-tab:hover { color:var(--text2); }
+  .modal-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .modal-body { flex:1; overflow-y:auto; padding:20px 22px; }
+  .modal-body::-webkit-scrollbar { width:4px; }
+  .modal-body::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+
+  .manage-section-label {
+    font-family:var(--mono); font-size:10px; color:var(--text3);
+    letter-spacing:.1em; text-transform:uppercase; margin-bottom:8px;
+  }
+
+  /* Add rows */
+  .add-row { display:flex; gap:8px; margin-bottom:18px; }
+  .add-row input {
+    flex:1; background:var(--surface2); border:1px solid var(--border2);
+    color:var(--text); font-family:var(--body); font-size:13px;
+    padding:8px 12px; border-radius:4px; outline:none; transition:border-color .15s;
+  }
+  .add-row input:focus { border-color:var(--accent); }
+  .add-row input::placeholder { color:var(--text3); }
+
+  .add-row-extra { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+  .add-row-extra input, .add-row-extra select {
+    flex:1; min-width:120px; background:var(--surface2); border:1px solid var(--border2);
+    color:var(--text); font-family:var(--body); font-size:13px;
+    padding:8px 12px; border-radius:4px; outline:none; transition:border-color .15s; appearance:none;
+  }
+  .add-row-extra input:focus, .add-row-extra select:focus { border-color:var(--accent); }
+
+  .btn-add {
+    font-family:var(--display); font-size:13px; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase;
+    padding:8px 16px; border-radius:3px; border:none;
+    background:var(--accent); color:#000; cursor:pointer;
+    white-space:nowrap; transition:background .15s; flex-shrink:0;
+  }
+  .btn-add:hover { background:#33ddff; }
+
+  /* Manage items */
+  .manage-list { display:flex; flex-direction:column; gap:6px; }
+  .manage-item {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; background:var(--surface2);
+    border:1px solid var(--border); border-radius:4px; transition:border-color .12s;
+  }
+  .manage-item:hover { border-color:var(--border2); }
+  .manage-item-name { font-size:14px; color:var(--text); font-weight:500; }
+  .manage-item-sub  { font-size:11px; color:var(--text3); font-family:var(--mono); margin-top:2px; }
+  .manage-item-actions { display:flex; gap:6px; align-items:center; }
+  .btn-del {
+    font-family:var(--mono); font-size:10px; color:var(--text3);
+    background:none; border:1px solid var(--border); border-radius:3px;
+    padding:3px 8px; cursor:pointer; transition:all .15s;
+  }
+  .btn-del:hover { color:var(--red); border-color:var(--red); }
+  .manage-empty {
+    text-align:center; padding:28px; color:var(--text3);
+    font-family:var(--mono); font-size:12px; line-height:1.8;
+  }
+
+  /* Sessions */
+  .meet-sessions-toggle {
+    font-family:var(--mono); font-size:10px; color:var(--accent);
+    background:none; border:none; cursor:pointer; padding:0;
+    letter-spacing:.06em; opacity:.8; transition:opacity .15s;
+  }
+  .meet-sessions-toggle:hover { opacity:1; }
+
+  .meet-card {
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:4px; overflow:hidden; margin-bottom:6px;
+  }
+  .meet-card-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px;
+  }
+
+  .session-sub-list {
+    padding:10px 14px 12px; border-top:1px solid var(--border);
+    background:var(--surface3); display:none;
+  }
+  .session-sub-list.open { display:block; }
+
+  .session-add-row { display:flex; gap:6px; margin-bottom:10px; }
+  .session-add-row input {
+    flex:1; background:var(--surface2); border:1px solid var(--border2);
+    color:var(--text); font-family:var(--body); font-size:12px;
+    padding:6px 10px; border-radius:3px; outline:none;
+  }
+  .session-add-row input:focus { border-color:var(--accent); }
+
+  .btn-add-sm {
+    font-family:var(--display); font-size:11px; font-weight:700;
+    letter-spacing:.05em; text-transform:uppercase;
+    padding:5px 10px; border-radius:3px; border:none;
+    background:var(--accent); color:#000; cursor:pointer; transition:background .15s;
+  }
+  .btn-add-sm:hover { background:#33ddff; }
+
+  .session-chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .session-chip {
+    display:inline-flex; align-items:center; gap:5px;
+    background:rgba(179,136,255,.1); border:1px solid rgba(179,136,255,.25);
+    color:var(--purple); font-family:var(--mono); font-size:11px;
+    padding:3px 8px; border-radius:2px;
+  }
+  .session-chip button {
+    background:none; border:none; color:var(--purple); cursor:pointer;
+    font-size:11px; padding:0; opacity:.6; transition:opacity .12s; line-height:1;
+  }
+  .session-chip button:hover { opacity:1; }
+  .sessions-empty { font-family:var(--mono); font-size:11px; color:var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    SWIMSYNC
+    <span style="font-weight:400;color:var(--text3);font-size:14px;letter-spacing:.02em">/ VIEWER</span>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="dot"></div>LIVE UPDATES ON</div>
+    <button class="btn-manage" onclick="openManage()">⚙ Manage Roster</button>
+    <div class="user-badge">VIEWER · DEMO</div>
+  </div>
+</header>
+
+<!-- APP -->
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Clip Library</div>
+      <div class="search-box">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="searchInput" placeholder="Search swimmer, event, meet…" oninput="applyFilters()"/>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="filter-group">
+        <label>Meet</label>
+        <select id="filterMeet" onchange="onMeetFilterChange()">
+          <option value="">All Meets</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Session</label>
+        <select id="filterSession" onchange="applyFilters()">
+          <option value="">All Sessions</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Swimmer</label>
+        <select id="filterSwimmer" onchange="applyFilters()">
+          <option value="">All Swimmers</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Event</label>
+          <select id="filterEvent" onchange="applyFilters()">
+            <option value="">All Events</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Stroke</label>
+          <select id="filterStroke" onchange="applyFilters()">
+            <option value="">All</option>
+            <option>Freestyle</option>
+            <option>Backstroke</option>
+            <option>Breaststroke</option>
+            <option>Butterfly</option>
+            <option>IM</option>
+          </select>
+        </div>
+      </div>
+      <button class="clear-filters" onclick="clearFilters()">
+        ✕ CLEAR FILTERS
+        <span id="activeFilterCount" class="active-filter-count" style="display:none"></span>
+      </button>
+    </div>
+
+    <div class="clip-list" id="clipList"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="demo-notice">⚠ DEMO MODE — showing sample data. Connect backend to see live clips.</div>
+
+    <!-- PLAYER -->
+    <div class="player-section">
+      <div id="playerWrap" class="player-empty">
+        <div class="player-empty-icon">▷</div>
+        <div class="player-empty-text">Select a clip to play</div>
+      </div>
+      <div class="clip-info" id="clipInfo" style="display:none">
+        <div class="clip-info-left">
+          <div class="clip-info-title"  id="infoTitle"></div>
+          <div class="clip-info-swimmer" id="infoSwimmer"></div>
+          <div class="clip-info-meet"   id="infoMeet"></div>
+          <div class="clip-info-meta"   id="infoMeta"></div>
+          <div class="clip-notes"       id="infoNotes"></div>
+        </div>
+        <div style="flex-shrink:0">
+          <div class="clip-timestamp" id="infoTime"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Clips</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><div class="stat-value" id="statSwimmers">0</div><div class="stat-label">Swimmers</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><div class="stat-value" id="statMeets">0</div><div class="stat-label">Meets</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><div class="stat-value" id="statFiltered">0</div><div class="stat-label">Showing</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><div class="stat-value" id="statLatest">—</div><div class="stat-label">Latest Upload</div></div>
+    </div>
+
+    <!-- GRID -->
+    <div class="recent-section">
+      <div class="section-title">All Clips</div>
+      <div class="clips-grid" id="clipsGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE MODAL -->
+<div class="modal-overlay" id="manageOverlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">MANAGE ROSTER</div>
+      <button class="modal-close" onclick="closeManage()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab-btn-swimmers" onclick="switchTab('swimmers')">Swimmers</button>
+      <button class="modal-tab"        id="tab-btn-meets"    onclick="switchTab('meets')">Meets &amp; Sessions</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- SWIMMERS -->
+      <div class="tab-pane active" id="tab-swimmers">
+        <div class="manage-section-label">Add Swimmer</div>
+        <div class="add-row">
+          <input type="text" id="newSwimmerName" placeholder="Full name…"
+                 onkeydown="if(event.key==='Enter')addSwimmer()"/>
+          <button class="btn-add" onclick="addSwimmer()">+ Add</button>
+        </div>
+        <div class="manage-section-label">Roster (<span id="swimmerCount">0</span>)</div>
+        <div class="manage-list" id="swimmerList"></div>
+      </div>
+
+      <!-- MEETS -->
+      <div class="tab-pane" id="tab-meets">
+        <div class="manage-section-label">Add Meet</div>
+        <div class="add-row-extra">
+          <input type="text" id="newMeetName" placeholder="Meet name…"
+                 onkeydown="if(event.key==='Enter')addMeet()"/>
+          <input type="date" id="newMeetDate"/>
+          <button class="btn-add" onclick="addMeet()">+ Add Meet</button>
+        </div>
+        <div class="manage-section-label">Meets (<span id="meetCount">0</span>)</div>
+        <div id="meetList"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let roster = {
+  swimmers: ["Marcus Chen","Priya Nair","Jordan Walsh","Sofia Reyes","Theo Park"],
+  meets: [
+    { id:'m1', name:"State Qualifier 2025", date:"2025-03-28",
+      sessions:["Morning Session","Afternoon Session"] },
+    { id:'m2', name:"Invitational March",   date:"2025-03-15",
+      sessions:["Session A","Session B"] }
+  ]
+};
+
+function saveRoster() {
+  try { localStorage.setItem('swimsync_roster', JSON.stringify(roster)); } catch(e){}
+}
+function loadRoster() {
+  try {
+    const s = localStorage.getItem('swimsync_roster');
+    if (s) roster = JSON.parse(s);
+  } catch(e){}
+}
+
+const DEMO_CLIPS = [
+  { id:1, swimmer:"Marcus Chen",  event:"100 Freestyle",   stroke:"Freestyle",
+    distance:"100m", heat:3, lane:4,
+    meet:"State Qualifier 2025", session:"Morning Session",
+    date:"2025-03-28", notes:"Strong start, slight hesitation at turn",
+    uploadedAt:new Date(Date.now()-2*60000),   fileUrl:null, isNew:true },
+  { id:2, swimmer:"Priya Nair",   event:"200 Butterfly",   stroke:"Butterfly",
+    distance:"200m", heat:2, lane:3,
+    meet:"State Qualifier 2025", session:"Afternoon Session",
+    date:"2025-03-28", notes:"Best split in heat 2",
+    uploadedAt:new Date(Date.now()-8*60000),   fileUrl:null, isNew:false },
+  { id:3, swimmer:"Jordan Walsh", event:"50 Freestyle",    stroke:"Freestyle",
+    distance:"50m",  heat:5, lane:6,
+    meet:"State Qualifier 2025", session:"Morning Session",
+    date:"2025-03-28", notes:"",
+    uploadedAt:new Date(Date.now()-14*60000),  fileUrl:null, isNew:false },
+  { id:4, swimmer:"Marcus Chen",  event:"200 IM",          stroke:"IM",
+    distance:"200m", heat:1, lane:2,
+    meet:"State Qualifier 2025", session:"Afternoon Session",
+    date:"2025-03-28", notes:"Watch breaststroke leg",
+    uploadedAt:new Date(Date.now()-22*60000),  fileUrl:null, isNew:false },
+  { id:5, swimmer:"Sofia Reyes",  event:"100 Backstroke",  stroke:"Backstroke",
+    distance:"100m", heat:4, lane:5,
+    meet:"Invitational March",   session:"Session A",
+    date:"2025-03-15", notes:"",
+    uploadedAt:new Date(Date.now()-31*60000),  fileUrl:null, isNew:false },
+  { id:6, swimmer:"Theo Park",    event:"100 Breaststroke",stroke:"Breaststroke",
+    distance:"100m", heat:2, lane:1,
+    meet:"Invitational March",   session:"Session B",
+    date:"2025-03-15", notes:"Compare to last week's recording",
+    uploadedAt:new Date(Date.now()-86400000),  fileUrl:null, isNew:false },
+];
+
+let clips = [...DEMO_CLIPS];
+let filteredClips = [...clips];
+let selectedClip = null;
+
+// ══════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════
+const timeAgo = d => {
+  const s = Math.floor((Date.now()-d)/1000);
+  if (s<60)    return s+'s ago';
+  if (s<3600)  return Math.floor(s/60)+'m ago';
+  if (s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+};
+const fmtTime = d => d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+const esc = s => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const uid = () => 'm'+Date.now()+Math.random().toString(36).slice(2,6);
+
+// ══════════════════════════════════════════════════════════
+// FILTERS
+// ══════════════════════════════════════════════════════════
+function populateFilters() {
+  // Meet — from roster
+  const meetSel = document.getElementById('filterMeet');
+  const curMeet = meetSel.value;
+  meetSel.innerHTML = '<option value="">All Meets</option>';
+  roster.meets.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.name; o.textContent = m.name;
+    if (m.name === curMeet) o.selected = true;
+    meetSel.appendChild(o);
+  });
+  populateSessionFilter(curMeet);
+
+  // Swimmer — from roster
+  const swimSel = document.getElementById('filterSwimmer');
+  const curSwim = swimSel.value;
+  swimSel.innerHTML = '<option value="">All Swimmers</option>';
+  [...roster.swimmers].sort().forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    if (s === curSwim) o.selected = true;
+    swimSel.appendChild(o);
+  });
+
+  // Event — from clip data
+  const eventSel = document.getElementById('filterEvent');
+  const curEvent = eventSel.value;
+  const events = [...new Set(clips.map(c=>c.event))].sort();
+  eventSel.innerHTML = '<option value="">All Events</option>';
+  events.forEach(e => {
+    const o = document.createElement('option');
+    o.value = e; o.textContent = e;
+    if (e === curEvent) o.selected = true;
+    eventSel.appendChild(o);
+  });
+}
+
+function populateSessionFilter(meetName) {
+  const sel = document.getElementById('filterSession');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Sessions</option>';
+  if (meetName) {
+    const meet = roster.meets.find(m=>m.name===meetName);
+    if (meet) meet.sessions.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s; o.textContent = s;
+      if (s === cur) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+}
+
+function onMeetFilterChange() {
+  const meet = document.getElementById('filterMeet').value;
+  populateSessionFilter(meet);
+  document.getElementById('filterSession').value = '';
+  applyFilters();
+}
+
+function applyFilters() {
+  const search  = document.getElementById('searchInput').value.toLowerCase();
+  const swimmer = document.getElementById('filterSwimmer').value;
+  const event   = document.getElementById('filterEvent').value;
+  const stroke  = document.getElementById('filterStroke').value;
+  const meet    = document.getElementById('filterMeet').value;
+  const session = document.getElementById('filterSession').value;
+
+  filteredClips = clips.filter(c => {
+    if (swimmer && c.swimmer !== swimmer) return false;
+    if (event   && c.event   !== event)   return false;
+    if (stroke  && c.stroke  !== stroke)  return false;
+    if (meet    && c.meet    !== meet)    return false;
+    if (session && c.session !== session) return false;
+    if (search) {
+      const hay = `${c.swimmer} ${c.event} ${c.stroke} ${c.notes} ${c.meet} ${c.session}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const count = [swimmer,event,stroke,meet,session,search].filter(Boolean).length;
+  const badge = document.getElementById('activeFilterCount');
+  badge.textContent = count;
+  badge.style.display = count ? 'inline-block' : 'none';
+
+  renderClipList(); renderGrid(); updateStats();
+}
+
+function clearFilters() {
+  ['searchInput'].forEach(id => document.getElementById(id).value = '');
+  ['filterSwimmer','filterEvent','filterStroke','filterMeet','filterSession']
+    .forEach(id => document.getElementById(id).value = '');
+  populateSessionFilter('');
+  applyFilters();
+}
+
+// ══════════════════════════════════════════════════════════
+// RENDER CLIP LIST
+// ══════════════════════════════════════════════════════════
+function renderClipList() {
+  const el = document.getElementById('clipList');
+  if (!filteredClips.length) {
+    el.innerHTML = '<div class="no-results">No clips match<br>your filters</div>'; return;
+  }
+  el.innerHTML = filteredClips.map(c=>`
+    <div class="clip-item ${selectedClip?.id===c.id?'active':''} ${c.isNew?'new-clip':''}"
+         onclick="selectClip(${c.id})">
+      <div class="clip-meta-top">
+        <div class="clip-event">${esc(c.event)}</div>
+        <div class="clip-time">${timeAgo(c.uploadedAt)}</div>
+      </div>
+      <div class="clip-swimmer">${esc(c.swimmer)}</div>
+      <div class="clip-meet-session">${esc(c.meet)}${c.session?' · '+esc(c.session):''}</div>
+      <div class="clip-tags">
+        <span class="tag tag-lane">LN ${c.lane}</span>
+        <span class="tag tag-heat">HT ${c.heat}</span>
+        <span class="tag tag-stroke">${esc(c.stroke)}</span>
+        ${c.session?`<span class="tag tag-session">${esc(c.session)}</span>`:''}
+        ${c.isNew?'<span class="tag tag-new">NEW</span>':''}
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// RENDER GRID
+// ══════════════════════════════════════════════════════════
+function renderGrid() {
+  const el = document.getElementById('clipsGrid');
+  if (!filteredClips.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;grid-column:1/-1;padding:20px 0">No clips to display.</div>';
+    return;
+  }
+  el.innerHTML = filteredClips.map(c=>`
+    <div class="grid-clip ${selectedClip?.id===c.id?'active':''}" onclick="selectClip(${c.id})">
+      <div class="grid-clip-event">${esc(c.event)}</div>
+      <div class="grid-clip-swimmer">${esc(c.swimmer)}</div>
+      <div class="grid-clip-meet">${esc(c.meet)}${c.session?' · '+esc(c.session):''}</div>
+      <div class="grid-clip-bottom">
+        <div class="grid-clip-tags">
+          <span class="tag tag-lane">LN ${c.lane}</span>
+          <span class="tag tag-heat">HT ${c.heat}</span>
+        </div>
+        <div class="grid-clip-time">${timeAgo(c.uploadedAt)}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// SELECT CLIP
+// ══════════════════════════════════════════════════════════
+function selectClip(id) {
+  selectedClip = clips.find(c=>c.id===id);
+  if (!selectedClip) return;
+
+  const wrap = document.getElementById('playerWrap');
+  if (selectedClip.fileUrl) {
+    wrap.className = 'player-wrap';
+    wrap.innerHTML = `<video controls autoplay><source src="${selectedClip.fileUrl}" type="video/mp4"/></video>`;
+  } else {
+    wrap.className = 'player-empty';
+    wrap.innerHTML = `<div class="player-empty-icon">▷</div><div class="player-empty-text">No video file (demo mode)</div>`;
+  }
+
+  document.getElementById('clipInfo').style.display = 'flex';
+  document.getElementById('infoTitle').textContent   = selectedClip.event;
+  document.getElementById('infoSwimmer').textContent = selectedClip.swimmer;
+  document.getElementById('infoMeet').textContent    =
+    selectedClip.meet + (selectedClip.session ? ' · ' + selectedClip.session : '');
+  document.getElementById('infoTime').textContent    =
+    `Uploaded ${fmtTime(selectedClip.uploadedAt)} · ${selectedClip.date}`;
+  document.getElementById('infoMeta').innerHTML = [
+    ['HEAT',selectedClip.heat],['LANE',selectedClip.lane],
+    ['STROKE',selectedClip.stroke],['DIST',selectedClip.distance],
+  ].map(([k,v])=>`<div class="meta-pill"><span>${k}</span> ${esc(String(v))}</div>`).join('');
+  document.getElementById('infoNotes').textContent =
+    selectedClip.notes ? `"${selectedClip.notes}"` : '';
+
+  renderClipList(); renderGrid();
+}
+
+// ══════════════════════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════════════════════
+function updateStats() {
+  document.getElementById('statTotal').textContent    = clips.length;
+  document.getElementById('statSwimmers').textContent = new Set(clips.map(c=>c.swimmer)).size;
+  document.getElementById('statMeets').textContent    = new Set(clips.map(c=>c.meet)).size;
+  document.getElementById('statFiltered').textContent = filteredClips.length;
+  const latest = clips[0];
+  document.getElementById('statLatest').textContent   = latest ? timeAgo(latest.uploadedAt) : '—';
+}
+
+// ══════════════════════════════════════════════════════════
+// MANAGE MODAL
+// ══════════════════════════════════════════════════════════
+function openManage() {
+  loadRoster(); renderManage();
+  document.getElementById('manageOverlay').classList.add('open');
+}
+function closeManage() {
+  document.getElementById('manageOverlay').classList.remove('open');
+  populateFilters(); applyFilters();
+}
+function overlayClick(e) {
+  if (e.target.id === 'manageOverlay') closeManage();
+}
+function switchTab(tab) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.modal-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('tab-btn-'+tab).classList.add('active');
+}
+function renderManage() { renderSwimmerList(); renderMeetList(); }
+
+// SWIMMERS
+function renderSwimmerList() {
+  document.getElementById('swimmerCount').textContent = roster.swimmers.length;
+  const el = document.getElementById('swimmerList');
+  if (!roster.swimmers.length) {
+    el.innerHTML = '<div class="manage-empty">No swimmers yet.<br>Add one above.</div>'; return;
+  }
+  el.innerHTML = [...roster.swimmers].sort().map(s=>`
+    <div class="manage-item">
+      <div class="manage-item-name">${esc(s)}</div>
+      <button class="btn-del" onclick="deleteSwimmer('${esc(s).replace(/'/g,"\\'")}')">Remove</button>
+    </div>`).join('');
+}
+
+function addSwimmer() {
+  const input = document.getElementById('newSwimmerName');
+  const name = input.value.trim();
+  if (!name) return;
+  if (roster.swimmers.map(s=>s.toLowerCase()).includes(name.toLowerCase())) {
+    input.style.borderColor='var(--red)'; setTimeout(()=>input.style.borderColor='',1200); return;
+  }
+  roster.swimmers.push(name); saveRoster(); input.value=''; renderSwimmerList();
+}
+
+function deleteSwimmer(name) {
+  if (!confirm(`Remove "${name}" from roster?`)) return;
+  roster.swimmers = roster.swimmers.filter(s=>s!==name);
+  saveRoster(); renderSwimmerList();
+}
+
+// MEETS
+function renderMeetList() {
+  document.getElementById('meetCount').textContent = roster.meets.length;
+  const el = document.getElementById('meetList');
+  if (!roster.meets.length) {
+    el.innerHTML = '<div class="manage-empty">No meets yet.<br>Add one above.</div>'; return;
+  }
+  el.innerHTML = roster.meets.map(m=>`
+    <div class="meet-card">
+      <div class="meet-card-header">
+        <div>
+          <div class="manage-item-name">${esc(m.name)}</div>
+          <div class="manage-item-sub">${m.date||'No date set'} · ${m.sessions.length} session${m.sessions.length!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="meet-sessions-toggle" onclick="toggleSessions('${m.id}')">▸ Sessions</button>
+          <button class="btn-del" onclick="deleteMeet('${m.id}')">Remove</button>
+        </div>
+      </div>
+      <div class="session-sub-list" id="sessions-${m.id}">
+        <div class="session-add-row">
+          <input type="text" id="sessInput-${m.id}"
+                 placeholder="Session name (e.g. Morning Session)…"
+                 onkeydown="if(event.key==='Enter')addSession('${m.id}')"/>
+          <button class="btn-add-sm" onclick="addSession('${m.id}')">+ Add</button>
+        </div>
+        <div class="session-chips" id="sessChips-${m.id}">
+          ${m.sessions.length
+            ? m.sessions.map(s=>`
+                <span class="session-chip">
+                  ${esc(s)}
+                  <button onclick="deleteSession('${m.id}','${esc(s).replace(/'/g,"\\'")}')">✕</button>
+                </span>`).join('')
+            : '<span class="sessions-empty">No sessions yet</span>'}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function addMeet() {
+  const nameInput = document.getElementById('newMeetName');
+  const dateInput = document.getElementById('newMeetDate');
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.style.borderColor='var(--red)'; setTimeout(()=>nameInput.style.borderColor='',1200); return; }
+  if (roster.meets.find(m=>m.name.toLowerCase()===name.toLowerCase())) {
+    nameInput.style.borderColor='var(--red)'; setTimeout(()=>nameInput.style.borderColor='',1200); return;
+  }
+  roster.meets.push({id:uid(), name, date:dateInput.value, sessions:[]});
+  saveRoster(); nameInput.value=''; dateInput.value=''; renderMeetList();
+}
+
+function deleteMeet(id) {
+  const m = roster.meets.find(m=>m.id===id);
+  if (!m || !confirm(`Remove "${m.name}" and all its sessions?`)) return;
+  roster.meets = roster.meets.filter(m=>m.id!==id);
+  saveRoster(); renderMeetList();
+}
+
+function toggleSessions(id) {
+  const p = document.getElementById('sessions-'+id);
+  if (p) p.classList.toggle('open');
+}
+
+function addSession(meetId) {
+  const input = document.getElementById('sessInput-'+meetId);
+  const name = input.value.trim(); if (!name) return;
+  const meet = roster.meets.find(m=>m.id===meetId); if (!meet) return;
+  if (meet.sessions.map(s=>s.toLowerCase()).includes(name.toLowerCase())) return;
+  meet.sessions.push(name); saveRoster(); input.value='';
+  renderMeetList();
+  setTimeout(()=>{ const p=document.getElementById('sessions-'+meetId); if(p)p.classList.add('open'); },10);
+}
+
+function deleteSession(meetId, sessName) {
+  const meet = roster.meets.find(m=>m.id===meetId); if (!meet) return;
+  meet.sessions = meet.sessions.filter(s=>s!==sessName);
+  saveRoster(); renderMeetList();
+  setTimeout(()=>{ const p=document.getElementById('sessions-'+meetId); if(p)p.classList.add('open'); },10);
+}
+
+// ══════════════════════════════════════════════════════════
+// SIMULATE NEW CLIP (demo only — replaced by WebSocket later)
+// ══════════════════════════════════════════════════════════
+function simulateNewClip() {
+  const evts    = ['50 Freestyle','100 Backstroke','200 Breaststroke','100 Butterfly'];
+  const strokes = ['Freestyle','Backstroke','Breaststroke','Butterfly'];
+  const i = Math.floor(Math.random()*evts.length);
+  const meet    = roster.meets[Math.floor(Math.random()*roster.meets.length)]
+                  || {name:'Demo Meet', sessions:[]};
+  const session = meet.sessions.length
+                  ? meet.sessions[Math.floor(Math.random()*meet.sessions.length)] : '';
+  const swimmer = roster.swimmers.length
+                  ? roster.swimmers[Math.floor(Math.random()*roster.swimmers.length)] : 'Unknown';
+  const c = {
+    id:Date.now(), swimmer, event:evts[i], stroke:strokes[i],
+    distance:evts[i].split(' ')[0]+'m',
+    heat:Math.ceil(Math.random()*5), lane:Math.ceil(Math.random()*8),
+    meet:meet.name, session,
+    date:new Date().toISOString().split('T')[0],
+    notes:'', uploadedAt:new Date(), fileUrl:null, isNew:true
+  };
+  clips.unshift(c);
+  setTimeout(()=>{ c.isNew=false; },4000);
+  populateFilters(); applyFilters();
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+loadRoster();
+populateFilters();
+applyFilters();
+setInterval(simulateNewClip, 45000);
+setInterval(()=>{ renderClipList(); renderGrid(); updateStats(); }, 30000);
+</script>
+</body>
+</html>
