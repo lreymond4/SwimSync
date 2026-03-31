@@ -304,8 +304,10 @@ header {
 .right-col {
   width:340px; min-width:340px;
   display:flex; flex-direction:column;
-  background:var(--surface); overflow:hidden;
+  background:var(--surface); overflow-y:auto;
 }
+.right-col::-webkit-scrollbar { width:3px; }
+.right-col::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
 
 .form-header {
   padding:14px 20px; border-bottom:1px solid var(--border); flex-shrink:0;
