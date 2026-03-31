@@ -689,6 +689,65 @@ let clips = [...DEMO_CLIPS];
 let filteredClips = [...clips];
 let selectedClip = null;
 
+const SWIMSYNC_API = 'https://swimsync-api.lreymond4.workers.dev';
+
+function mapVideo(v) {
+  const parts = (v.title || '').split(' — ');
+  const event   = parts[0] || v.title || 'Unknown';
+  const swimmer = parts[1] || v.uploader?.display_name || '—';
+  const heat    = parts[2]?.replace('Heat ', '') || '—';
+  const lane    = parts[3]?.replace('Ln ',   '') || '—';
+  const stroke  = event.includes('Freestyle')   ? 'Freestyle'
+                : event.includes('Backstroke')  ? 'Backstroke'
+                : event.includes('Breaststroke')? 'Breaststroke'
+                : event.includes('Butterfly')   ? 'Butterfly'
+                : event.includes('IM')          ? 'IM'
+                : event.includes('Relay')       ? 'Relay' : '—';
+  const distM   = event.match(/^(\d+)/);
+  return {
+    id: v.id, event, swimmer, heat, lane, stroke,
+    distance:  distM ? distM[1]+'m' : '—',
+    meet:      v.meet?.name || '—',
+    session:   '—',
+    date:      (v.created_at || '').split('T')[0],
+    notes:     '',
+    uploadedAt: new Date(v.created_at),
+    fileUrl:   null,
+    fileKey:   v.file_key,
+    isNew:     (Date.now() - new Date(v.created_at)) < 5 * 60 * 1000,
+  };
+}
+
+async function loadClips() {
+  try {
+    const res = await fetch(`${SWIMSYNC_API}/api/videos?limit=100`);
+    if (!res.ok) return;
+    const { videos } = await res.json();
+    if (videos && videos.length > 0) {
+      clips = videos.map(mapVideo);
+      filteredClips = [...clips];
+      document.querySelector('.demo-notice').style.display = 'none';
+      populateFilters();
+      applyFilters();
+    }
+  } catch (e) {
+    console.warn('Could not load clips from backend:', e);
+  }
+}
+
+async function pollClips() {
+  try {
+    const res = await fetch(`${SWIMSYNC_API}/api/videos?limit=100`);
+    if (!res.ok) return;
+    const { videos } = await res.json();
+    if (videos && videos.length !== clips.length) {
+      clips = videos.map(mapVideo);
+      populateFilters();
+      applyFilters();
+    }
+  } catch (e) {}
+}
+
 // ══════════════════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════════════════
@@ -858,11 +917,24 @@ function renderGrid() {
 // ══════════════════════════════════════════════════════════
 // SELECT CLIP
 // ══════════════════════════════════════════════════════════
-function selectClip(id) {
+async function selectClip(id) {
   selectedClip = clips.find(c=>c.id===id);
   if (!selectedClip) return;
 
   const wrap = document.getElementById('playerWrap');
+
+  if (selectedClip.fileKey && !selectedClip.fileUrl) {
+    wrap.className = 'player-empty';
+    wrap.innerHTML = `<div class="player-empty-icon">↻</div><div class="player-empty-text">Loading…</div>`;
+    try {
+      const res = await fetch(`${SWIMSYNC_API}/api/videos/${selectedClip.id}/url`);
+      if (res.ok) {
+        const { url } = await res.json();
+        selectedClip.fileUrl = url;
+      }
+    } catch (e) {}
+  }
+
   if (selectedClip.fileUrl) {
     wrap.className = 'player-wrap';
     wrap.innerHTML = `<video controls autoplay><source src="${selectedClip.fileUrl}" type="video/mp4"/></video>`;
@@ -1064,7 +1136,8 @@ function simulateNewClip() {
 loadRoster();
 populateFilters();
 applyFilters();
-setInterval(simulateNewClip, 45000);
+loadClips();
+setInterval(pollClips, 30000);
 setInterval(()=>{ renderClipList(); renderGrid(); updateStats(); }, 30000);
 </script>
 </body>
