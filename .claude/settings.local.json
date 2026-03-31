@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r https:// '/c/Users/leere/OneDrive/Desktop/SwimSync Clone Deposit/SwimSync/' --include=*.js --include=*.html)"
+    ]
+  }
+}

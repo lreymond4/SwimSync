@@ -11,9 +11,9 @@
  *   3. Call uploadVideo(file, { meetId, title }) to upload a video.
  */
 
-const SWIMSYNC_API   = 'https://swimsync-api.<YOUR_SUBDOMAIN>.workers.dev'; // ← replace
-const SUPABASE_URL   = 'https://<YOUR_PROJECT>.supabase.co';                // ← replace
-const SUPABASE_ANON  = '<YOUR_SUPABASE_ANON_KEY>';                          // ← replace
+const SWIMSYNC_API  = 'https://swimsync-api.lreymond4.workers.dev';
+const SUPABASE_URL  = 'https://edgjsovpibfysmdxwphx.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_XzChteKfzNW-2HXBctgKFw_5jg-O0uC';                        // ← replace
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
