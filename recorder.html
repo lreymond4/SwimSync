@@ -329,9 +329,8 @@ header {
 }
 .mode-tab.active { background:var(--accent); color:#000; font-weight:500; }
 
-.form-body { flex:1; overflow-y:auto; padding:16px 20px; }
-.form-body::-webkit-scrollbar { width:3px; }
-.form-body::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+.form-body { padding:16px 20px; }
+
 
 /* UPLOAD DROP ZONE */
 .drop-zone {
@@ -409,8 +408,9 @@ header {
 
 /* SUBMIT */
 .form-footer {
-  padding:14px 20px; border-top:1px solid var(--border); flex-shrink:0;
+  padding:14px 20px; border-top:1px solid var(--border);
   display:flex; flex-direction:column; gap:8px;
+  position:sticky; bottom:0; background:var(--surface); z-index:10;
 }
 
 .btn-submit {
@@ -1226,14 +1226,9 @@ async function submitClip() {
     showToast('No file selected.', 'error'); return;
   }
 
-  // meetId is required by the backend — look up from roster
+  // Look up meetId from roster if a meet was selected
   const meetObj = roster.meets.find(m => m.name === data.meet);
-  if (!meetObj) {
-    showToast('Please select a meet before uploading', 'error');
-    document.getElementById('fMeet').classList.add('error');
-    return;
-  }
-  const meetId = meetObj.id;
+  const meetId  = meetObj ? meetObj.id : null;
 
   // Build a descriptive title
   const title = [data.event, data.swimmer, data.heat ? 'Heat '+data.heat : '', data.lane ? 'Ln '+data.lane : '']
