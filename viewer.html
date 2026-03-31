@@ -873,7 +873,7 @@ function renderClipList() {
   }
   el.innerHTML = filteredClips.map(c=>`
     <div class="clip-item ${selectedClip?.id===c.id?'active':''} ${c.isNew?'new-clip':''}"
-         onclick="selectClip(${c.id})">
+         onclick="selectClip('${c.id}')">
       <div class="clip-meta-top">
         <div class="clip-event">${esc(c.event)}</div>
         <div class="clip-time">${timeAgo(c.uploadedAt)}</div>
@@ -900,7 +900,7 @@ function renderGrid() {
     return;
   }
   el.innerHTML = filteredClips.map(c=>`
-    <div class="grid-clip ${selectedClip?.id===c.id?'active':''}" onclick="selectClip(${c.id})">
+    <div class="grid-clip ${selectedClip?.id===c.id?'active':''}" onclick="selectClip('${c.id}')">
       <div class="grid-clip-event">${esc(c.event)}</div>
       <div class="grid-clip-swimmer">${esc(c.swimmer)}</div>
       <div class="grid-clip-meet">${esc(c.meet)}${c.session?' · '+esc(c.session):''}</div>
