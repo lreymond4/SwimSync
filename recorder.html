@@ -1230,8 +1230,9 @@ async function submitClip() {
     .filter(Boolean).join(' — ');
 
   // Convert blob to File if coming from live recording
-  const ext  = (rawBlob.type || 'video/webm').split('/')[1]?.split(';')[0] || 'webm';
-  const file = rawBlob instanceof File ? rawBlob : new File([rawBlob], `clip_${Date.now()}.${ext}`, { type: rawBlob.type || 'video/webm' });
+  const mimeBase = (rawBlob.type || 'video/mp4').split(';')[0];
+  const ext  = mimeBase.split('/')[1] || 'mp4';
+  const file = rawBlob instanceof File ? rawBlob : new File([rawBlob], `clip_${Date.now()}.${ext}`, { type: mimeBase });
 
   const id   = 'clip_' + Date.now();
   const item = { id, meta: data, blob: rawBlob, status: isOnline ? 'uploading' : 'queued', uploadedAt: new Date() };
@@ -1357,8 +1358,9 @@ async function processQueue() {
     if (!meetObj) { item.status = 'queued'; renderQueue(); continue; }
     const meetId = meetObj.id;
     const title  = [item.meta.event, item.meta.swimmer].filter(Boolean).join(' — ');
-    const ext    = (item.blob.type || 'video/webm').split('/')[1]?.split(';')[0] || 'webm';
-    const file   = item.blob instanceof File ? item.blob : new File([item.blob], `clip_${item.id}.${ext}`, { type: item.blob.type || 'video/webm' });
+    const mimeBase = (item.blob.type || 'video/mp4').split(';')[0];
+    const ext    = mimeBase.split('/')[1] || 'mp4';
+    const file   = item.blob instanceof File ? item.blob : new File([item.blob], `clip_${item.id}.${ext}`, { type: mimeBase });
     try {
       await uploadVideo(file, { meetId, title });
       item.status = 'uploaded';
