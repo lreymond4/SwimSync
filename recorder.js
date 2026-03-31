@@ -25,11 +25,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
  */
 async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    // Show login UI or redirect — adjust to your design
-    showLoginForm();
-    return null;
-  }
+  if (!session) return null;
   return session;
 }
 
