@@ -72,7 +72,7 @@ async function uploadVideo(file, { meetId, title }, onProgress) {
       filename:    file.name,
       contentType: file.type,
       fileSize:    file.size,
-      meetId,
+      meetId: /^[0-9a-f-]{36}$/i.test(meetId) ? meetId : null,
       title,
     }),
   });
