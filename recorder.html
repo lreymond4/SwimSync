@@ -477,8 +477,60 @@ header {
 .btn-modal.cancel:hover { border-color:var(--text2); }
 .btn-modal.confirm { background:var(--red); color:#fff; }
 .btn-modal.confirm:hover { background:#ff5555; }
+
+/* ── LOGIN OVERLAY ───────────────────────────────────────── */
+.login-overlay {
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(8,10,13,.92); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center;
+}
+.login-overlay.visible { display:flex; }
+.login-card {
+  background:var(--surface); border:1px solid var(--border2);
+  border-radius:6px; padding:36px 32px; width:320px;
+  display:flex; flex-direction:column; gap:14px;
+}
+.login-logo {
+  font-family:var(--display); font-size:18px; font-weight:900;
+  letter-spacing:.06em; display:flex; align-items:center; gap:10px;
+  margin-bottom:4px;
+}
+.login-title {
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  color:var(--text2); text-transform:uppercase;
+}
+.login-input {
+  background:var(--surface2); border:1px solid var(--border2);
+  color:var(--text); font-family:var(--body); font-size:14px;
+  padding:10px 12px; border-radius:3px; outline:none; width:100%;
+}
+.login-input:focus { border-color:var(--accent); }
+.login-btn {
+  background:var(--accent); color:#000; border:none;
+  font-family:var(--display); font-size:14px; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase;
+  padding:11px; border-radius:3px; cursor:pointer; transition:opacity .15s;
+}
+.login-btn:hover { opacity:.85; }
+.login-btn:disabled { opacity:.45; cursor:not-allowed; }
+.login-error {
+  background:rgba(255,59,59,.1); border:1px solid rgba(255,59,59,.3);
+  color:var(--red); font-size:13px; padding:8px 12px; border-radius:3px;
+}
 </style>
 </head>
+
+<!-- Login overlay -->
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-card">
+    <div class="login-logo"><span class="logo-mark">▶</span> SwimSync</div>
+    <div class="login-title">Sign in to record</div>
+    <div id="loginError" class="login-error" style="display:none"></div>
+    <input type="email"    id="loginEmail" class="login-input" placeholder="Email" autocomplete="email"/>
+    <input type="password" id="loginPassword" class="login-input" placeholder="Password" autocomplete="current-password"/>
+    <button class="login-btn" onclick="handleLogin()">Sign In</button>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="recorder.js"></script>
@@ -504,6 +556,8 @@ header {
       <div class="dot"></div>
       <span id="connLabel">ONLINE</span>
     </div>
+    <span id="userEmail" style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:.04em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <button onclick="logout()" style="font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:2px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;letter-spacing:.06em;" title="Sign out">SIGN OUT</button>
   </div>
 </header>
 
@@ -767,7 +821,7 @@ let uploadQueue = [];        // [{blob, meta, id, status}]
 // ══════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   loadRoster();
   populateFormRoster();
   setTodayDate();
@@ -775,6 +829,14 @@ window.addEventListener('load', () => {
   setMode('live');
   loadQueue();
   renderQueue();
+
+  // Auth: show login overlay if no session
+  const session = await initAuth();
+  if (!session) {
+    document.getElementById('loginOverlay').classList.add('visible');
+  } else {
+    document.getElementById('userEmail').textContent = session.user.email;
+  }
 });
 
 window.addEventListener('online',  () => { isOnline=true;  updateConnBadge(); processQueue(); });
@@ -1153,29 +1215,78 @@ async function submitClip() {
     showToast('Please fill in required fields', 'error'); return;
   }
 
-  const blob = mode === 'live' ? currentBlob : (selectedFile ? selectedFile : null);
+  const rawBlob = mode === 'live' ? currentBlob : (selectedFile ? selectedFile : null);
 
-  if (mode === 'live' && !blob) {
+  if (mode === 'live' && !rawBlob) {
     showToast('No recording found. Record a clip first.', 'error'); return;
   }
-  if (mode === 'upload' && !blob) {
+  if (mode === 'upload' && !rawBlob) {
     showToast('No file selected.', 'error'); return;
   }
 
-  const id = 'clip_' + Date.now();
-  const item = { id, meta: data, blob, status: isOnline ? 'uploading' : 'queued', uploadedAt: new Date() };
+  // meetId is required by the backend — look up from roster
+  const meetObj = roster.meets.find(m => m.name === data.meet);
+  if (!meetObj) {
+    showToast('Please select a meet before uploading', 'error');
+    document.getElementById('fMeet').classList.add('error');
+    return;
+  }
+  const meetId = meetObj.id;
+
+  // Build a descriptive title
+  const title = [data.event, data.swimmer, data.heat ? 'Heat '+data.heat : '', data.lane ? 'Ln '+data.lane : '']
+    .filter(Boolean).join(' — ');
+
+  // Convert blob to File if coming from live recording
+  const ext  = (rawBlob.type || 'video/webm').split('/')[1]?.split(';')[0] || 'webm';
+  const file = rawBlob instanceof File ? rawBlob : new File([rawBlob], `clip_${Date.now()}.${ext}`, { type: rawBlob.type || 'video/webm' });
+
+  const id   = 'clip_' + Date.now();
+  const item = { id, meta: data, blob: rawBlob, status: isOnline ? 'uploading' : 'queued', uploadedAt: new Date() };
   uploadQueue.unshift(item);
   saveQueue();
   renderQueue();
 
-  if (isOnline) {
-    await simulateUpload(item);
-  } else {
+  if (!isOnline) {
     showToast('Saved locally — will upload when online', 'success');
     updateQueueBadge();
+    resetForm();
+    return;
   }
 
-  resetForm();
+  // Wire progress bar
+  const wrap = document.getElementById('uploadBarWrap');
+  const fill = document.getElementById('uploadBarFill');
+  const pct  = document.getElementById('uploadBarPct');
+  const lbl  = document.getElementById('uploadBarLabel');
+
+  wrap.classList.add('visible');
+  lbl.textContent = `Uploading ${data.event} — ${data.swimmer}…`;
+  fill.style.width = '0%';
+  pct.textContent  = '0%';
+
+  try {
+    await uploadVideo(file, { meetId, title }, (progress) => {
+      fill.style.width = progress + '%';
+      pct.textContent  = progress + '%';
+    });
+
+    item.status = 'uploaded';
+    saveQueue();
+    renderQueue();
+    showToast(`${data.event} uploaded successfully`, 'success');
+    resetForm();
+  } catch (err) {
+    item.status = 'queued';
+    saveQueue();
+    renderQueue();
+    showToast(`Upload failed: ${err.message}`, 'error');
+  } finally {
+    wrap.classList.remove('visible');
+    fill.style.width = '0%';
+    pct.textContent  = '0%';
+    updateQueueBadge();
+  }
 }
 
 function saveLocal() {
@@ -1245,11 +1356,26 @@ async function simulateUpload(item) {
 }
 
 async function processQueue() {
-  const pending = uploadQueue.filter(i => i.status === 'queued');
+  // Only process items that still have a blob in memory (blobs are lost on page reload)
+  const pending = uploadQueue.filter(i => i.status === 'queued' && i.blob);
   for (const item of pending) {
     item.status = 'uploading';
     renderQueue();
-    await simulateUpload(item);
+    const meetObj = roster.meets.find(m => m.name === item.meta.meet);
+    if (!meetObj) { item.status = 'queued'; renderQueue(); continue; }
+    const meetId = meetObj.id;
+    const title  = [item.meta.event, item.meta.swimmer].filter(Boolean).join(' — ');
+    const ext    = (item.blob.type || 'video/webm').split('/')[1]?.split(';')[0] || 'webm';
+    const file   = item.blob instanceof File ? item.blob : new File([item.blob], `clip_${item.id}.${ext}`, { type: item.blob.type || 'video/webm' });
+    try {
+      await uploadVideo(file, { meetId, title });
+      item.status = 'uploaded';
+    } catch (err) {
+      item.status = 'queued';
+      showToast(`Queue upload failed: ${err.message}`, 'error');
+    }
+    saveQueue();
+    renderQueue();
   }
 }
 
@@ -1342,6 +1468,39 @@ function showToast(msg, type='success') {
   t.className = 'toast show ' + type;
   toastTimeout = setTimeout(() => { t.classList.remove('show'); }, 3200);
 }
+
+// ══════════════════════════════════════════════════════════════
+// AUTH UI
+// ══════════════════════════════════════════════════════════════
+async function handleLogin() {
+  const email    = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl    = document.getElementById('loginError');
+  const btn      = document.querySelector('.login-btn');
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const session = await login(email, password);
+    document.getElementById('loginOverlay').classList.remove('visible');
+    document.getElementById('userEmail').textContent = session.user.email;
+  } catch (err) {
+    errEl.textContent = err.message || 'Sign in failed';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+}
+
+// Allow pressing Enter in the login form to submit
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('loginOverlay').classList.contains('visible')) {
+    handleLogin();
+  }
+});
 
 // Keyboard shortcut: Space to toggle record when in live mode
 document.addEventListener('keydown', e => {
