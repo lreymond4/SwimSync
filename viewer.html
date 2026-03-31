@@ -463,6 +463,77 @@
   }
   .session-chip button:hover { opacity:1; }
   .sessions-empty { font-family:var(--mono); font-size:11px; color:var(--text3); }
+
+  /* ── NOTES EDITOR ───────────────────────────────────────── */
+  .notes-editor { margin-top:8px; }
+  .notes-view { display:flex; align-items:flex-start; gap:8px; }
+  .notes-text { font-size:13px; color:var(--text2); font-style:italic; flex:1; }
+  .btn-edit-notes {
+    font-family:var(--mono); font-size:9px; letter-spacing:.06em;
+    padding:2px 7px; border-radius:2px; border:1px solid var(--border2);
+    background:transparent; color:var(--text3); cursor:pointer; flex-shrink:0;
+    transition:color .12s, border-color .12s;
+  }
+  .btn-edit-notes:hover { color:var(--accent); border-color:var(--accent); }
+  .notes-edit-wrap { display:none; margin-top:6px; }
+  .notes-edit-wrap.open { display:block; }
+  .notes-textarea {
+    width:100%; background:var(--surface2); border:1px solid var(--border2);
+    color:var(--text); font-size:13px; font-family:inherit; padding:8px 10px;
+    border-radius:3px; resize:vertical; min-height:70px; outline:none;
+  }
+  .notes-textarea:focus { border-color:var(--accent); }
+  .notes-edit-footer {
+    display:flex; justify-content:space-between; align-items:center; margin-top:5px;
+  }
+  .notes-char-count { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .notes-char-count.over { color:var(--red); }
+  .notes-edit-btns { display:flex; gap:6px; }
+  .btn-save-notes {
+    font-family:var(--mono); font-size:10px; letter-spacing:.06em; padding:4px 10px;
+    border-radius:2px; border:none; background:var(--accent); color:#000; cursor:pointer;
+  }
+  .btn-save-notes:disabled { opacity:.4; cursor:not-allowed; }
+  .btn-cancel-notes {
+    font-family:var(--mono); font-size:10px; letter-spacing:.06em; padding:4px 10px;
+    border-radius:2px; border:1px solid var(--border2); background:transparent;
+    color:var(--text2); cursor:pointer;
+  }
+
+  /* ── DELETE BUTTON ──────────────────────────────────────── */
+  .btn-delete-clip {
+    font-family:var(--mono); font-size:10px; letter-spacing:.06em; padding:4px 10px;
+    border-radius:2px; border:1px solid rgba(255,82,82,.3); background:transparent;
+    color:var(--red); cursor:pointer; transition:all .15s; margin-top:8px;
+  }
+  .btn-delete-clip:hover { background:rgba(255,82,82,.1); border-color:var(--red); }
+
+  /* ── LOGIN OVERLAY ──────────────────────────────────────── */
+  .login-overlay {
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(10,12,16,.92); backdrop-filter:blur(4px);
+    align-items:center; justify-content:center;
+  }
+  .login-overlay.visible { display:flex; }
+  .login-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; padding:36px 32px; width:320px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .login-card-title { font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--text2); text-transform:uppercase; }
+  .login-input {
+    background:var(--surface2); border:1px solid var(--border);
+    color:var(--text); font-size:14px; padding:10px 12px;
+    border-radius:3px; outline:none; width:100%;
+  }
+  .login-input:focus { border-color:var(--accent); }
+  .login-submit {
+    background:var(--accent); color:#000; border:none;
+    font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:.06em;
+    text-transform:uppercase; padding:11px; border-radius:3px; cursor:pointer;
+  }
+  .login-submit:disabled { opacity:.4; cursor:not-allowed; }
+  .login-err { font-size:13px; color:var(--red); display:none; }
 </style>
 </head>
 <body>
@@ -477,7 +548,9 @@
   <div class="header-right">
     <div class="live-badge"><div class="dot"></div>LIVE UPDATES ON</div>
     <button class="btn-manage" onclick="openManage()">⚙ Manage Roster</button>
-    <div class="user-badge">VIEWER · DEMO</div>
+    <span id="viewerEmail" style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:.04em;display:none;"></span>
+    <button id="btnViewerSignIn"  onclick="document.getElementById('viewerLoginOverlay').classList.add('visible')"  style="font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;letter-spacing:.06em;">SIGN IN</button>
+    <button id="btnViewerSignOut" onclick="viewerLogout()" style="display:none;font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;letter-spacing:.06em;">SIGN OUT</button>
   </div>
 </header>
 
@@ -710,7 +783,7 @@ function mapVideo(v) {
     meet:      v.meet?.name || '—',
     session:   '—',
     date:      (v.created_at || '').split('T')[0],
-    notes:     '',
+    notes:     v.notes || '',
     uploadedAt: new Date(v.created_at),
     fileUrl:   null,
     fileKey:   v.file_key,
@@ -954,8 +1027,28 @@ async function selectClip(id) {
     ['HEAT',selectedClip.heat],['LANE',selectedClip.lane],
     ['STROKE',selectedClip.stroke],['DIST',selectedClip.distance],
   ].map(([k,v])=>`<div class="meta-pill"><span>${k}</span> ${esc(String(v))}</div>`).join('');
-  document.getElementById('infoNotes').textContent =
-    selectedClip.notes ? `"${selectedClip.notes}"` : '';
+  // Notes + edit button (only if logged in)
+  const notesEl = document.getElementById('infoNotes');
+  const notes   = selectedClip.notes || '';
+  notesEl.innerHTML = `
+    <div class="notes-editor">
+      <div class="notes-view">
+        <span class="notes-text">${notes ? esc('"' + notes + '"') : '<span style="color:var(--text3);font-style:normal">No notes</span>'}</span>
+        ${viewerSession ? `<button class="btn-edit-notes" onclick="openNotesEdit('${selectedClip.id}', ${JSON.stringify(notes)})">Edit</button>` : ''}
+      </div>
+      <div class="notes-edit-wrap" id="notesEditWrap">
+        <textarea class="notes-textarea" id="notesTextarea" maxlength="500" oninput="updateCharCount()" placeholder="Add notes…"></textarea>
+        <div class="notes-edit-footer">
+          <span class="notes-char-count" id="notesCharCount">0/500</span>
+          <div class="notes-edit-btns">
+            <button class="btn-cancel-notes" onclick="closeNotesEdit()">Cancel</button>
+            <button class="btn-save-notes" id="btnSaveNotes" onclick="saveNotes('${selectedClip.id}')">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${viewerSession ? `<button class="btn-delete-clip" onclick="deleteClip('${selectedClip.id}')">Delete Clip</button>` : ''}
+  `;
 
   renderClipList(); renderGrid();
 }
@@ -1137,8 +1230,153 @@ loadRoster();
 populateFilters();
 applyFilters();
 loadClips();
+initViewerAuth();
 setInterval(pollClips, 30000);
 setInterval(()=>{ renderClipList(); renderGrid(); updateStats(); }, 30000);
+</script>
+
+<!-- Login overlay -->
+<div id="viewerLoginOverlay" class="login-overlay">
+  <div class="login-card">
+    <div class="login-card-title">Sign in to edit &amp; delete</div>
+    <div class="login-err" id="viewerLoginErr"></div>
+    <input type="email"    id="viewerLoginEmail"    class="login-input" placeholder="Email" autocomplete="email"/>
+    <input type="password" id="viewerLoginPassword" class="login-input" placeholder="Password" autocomplete="current-password"/>
+    <button class="login-submit" id="viewerLoginBtn" onclick="handleViewerLogin()">Sign In</button>
+    <button onclick="document.getElementById('viewerLoginOverlay').classList.remove('visible')"
+            style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-align:center;">Cancel</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const VIEWER_SB = supabase.createClient(
+  'https://edgjsovpibfysmdxwphx.supabase.co',
+  'sb_publishable_XzChteKfzNW-2HXBctgKFw_5jg-O0uC'
+);
+let viewerSession = null;
+
+async function initViewerAuth() {
+  const { data: { session } } = await VIEWER_SB.auth.getSession();
+  setViewerSession(session);
+}
+
+function setViewerSession(session) {
+  viewerSession = session;
+  const email   = document.getElementById('viewerEmail');
+  const signIn  = document.getElementById('btnViewerSignIn');
+  const signOut = document.getElementById('btnViewerSignOut');
+  if (session) {
+    email.textContent  = session.user.email;
+    email.style.display = '';
+    signIn.style.display  = 'none';
+    signOut.style.display = '';
+  } else {
+    email.style.display   = 'none';
+    signIn.style.display  = '';
+    signOut.style.display = 'none';
+  }
+  // Refresh detail panel if a clip is selected
+  if (selectedClip) selectClip(selectedClip.id);
+}
+
+async function handleViewerLogin() {
+  const email    = document.getElementById('viewerLoginEmail').value.trim();
+  const password = document.getElementById('viewerLoginPassword').value;
+  const errEl    = document.getElementById('viewerLoginErr');
+  const btn      = document.getElementById('viewerLoginBtn');
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const { data, error } = await VIEWER_SB.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    document.getElementById('viewerLoginOverlay').classList.remove('visible');
+    setViewerSession(data.session);
+  } catch (err) {
+    errEl.textContent = err.message || 'Sign in failed';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+async function viewerLogout() {
+  await VIEWER_SB.auth.signOut();
+  setViewerSession(null);
+}
+
+async function deleteClip(id) {
+  if (!viewerSession) return;
+  if (!confirm('Permanently delete this clip? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`${SWIMSYNC_API}/api/videos/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${viewerSession.access_token}` },
+    });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error || 'Delete failed'); }
+    clips = clips.filter(c => c.id !== id);
+    selectedClip = null;
+    document.getElementById('clipInfo').style.display = 'none';
+    document.getElementById('playerWrap').className = 'player-empty';
+    document.getElementById('playerWrap').innerHTML = '<div class="player-empty-icon">▷</div><div class="player-empty-text">Select a clip to play</div>';
+    populateFilters(); applyFilters();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function saveNotes(id) {
+  if (!viewerSession) return;
+  const textarea = document.getElementById('notesTextarea');
+  const notes = textarea.value;
+  if (notes.length > 500) return;
+  const btn = document.getElementById('btnSaveNotes');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await fetch(`${SWIMSYNC_API}/api/videos/${id}/notes`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${viewerSession.access_token}` },
+      body: JSON.stringify({ notes }),
+    });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error || 'Save failed'); }
+    const clip = clips.find(c => c.id === id);
+    if (clip) clip.notes = notes;
+    if (selectedClip?.id === id) selectedClip.notes = notes;
+    closeNotesEdit();
+    document.getElementById('infoNotes').textContent = notes ? `"${notes}"` : '';
+  } catch (err) {
+    alert('Error: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+function openNotesEdit(id, currentNotes) {
+  const wrap = document.getElementById('notesEditWrap');
+  const textarea = document.getElementById('notesTextarea');
+  textarea.value = currentNotes || '';
+  updateCharCount();
+  wrap.classList.add('open');
+}
+
+function closeNotesEdit() {
+  document.getElementById('notesEditWrap').classList.remove('open');
+}
+
+function updateCharCount() {
+  const textarea = document.getElementById('notesTextarea');
+  const count = document.getElementById('notesCharCount');
+  const len = textarea.value.length;
+  count.textContent = `${len}/500`;
+  count.className = 'notes-char-count' + (len > 500 ? ' over' : '');
+  document.getElementById('btnSaveNotes').disabled = len > 500;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('viewerLoginOverlay').classList.contains('visible')) {
+    handleViewerLogin();
+  }
+});
 </script>
 </body>
 </html>
