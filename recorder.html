@@ -613,7 +613,10 @@ header {
     <div class="clip-queue">
       <div class="queue-header">
         <span>Recent Clips</span>
-        <span id="clipCount">0 clips</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="clipCount">0 clips</span>
+          <button onclick="clearQueue()" style="font-family:var(--mono);font-size:9px;letter-spacing:.06em;padding:2px 7px;border-radius:2px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;" title="Clear all clips from list">CLEAR</button>
+        </div>
       </div>
       <div id="queueList">
         <div class="queue-empty">No clips yet.<br>Record or upload a clip<br>to see it here.</div>
@@ -1395,6 +1398,12 @@ function loadQueue() {
       }));
     }
   } catch(e){}
+}
+
+function clearQueue() {
+  uploadQueue = [];
+  saveQueue();
+  renderQueue();
 }
 
 function updateQueueBadge() {
